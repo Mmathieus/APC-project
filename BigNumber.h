@@ -18,54 +18,51 @@
 class BigInteger
 {
 public:
-    // Prazdny konstruktor
+    // constructors
     BigInteger() {
-        
-        vv.push_back(0);
+        this->vv.push_back(0);
+        this->zero = true;
     };
     
-    // Ciselny konstruktor
     BigInteger(int64_t n) {
-        
         if (n == 0) {
-            vv.push_back(0);
+            this->vv.push_back(0);
+            this->zero = true;
             return;
         }
 
         if (n < 0) {
-            negative = true;
+            this->negative = true;
             n = -n;
         }
 
         // Rychle vybavenie cisla pod limitom
         if (n < MODULO) {
-            vv.push_back(n);
+            this->vv.push_back(n);
             return;
         }
 
         // Ak cislo nad limitom
         while (n != 0) {
-            int64_t nn = n % MODULO;
-            vv.push_back(nn);
+            uint64_t nn = n % MODULO;
+            this->vv.push_back(nn);
             n /= MODULO;
         }
     };
     
-    // Stringovy konstruktor
     explicit BigInteger(const std::string& str) {
-        
         // Zachytenie prazdneho stringu
         if (str.empty()) {
             throw std::runtime_error("Empty string!");
         }
 
-        //! Zachytenie medzier v stringu | MOZNO POUZIT std::isspace()!!!
+        //! Zachytenie medzier v stringu | MOZNO POUZIT std::isspace()
         if (str.front() == ' ' || str.back() == ' ') {
             throw std::runtime_error("White space(s) in string!");
         }
 
-        int64_t position = 0;
-        bool positive = true;
+        uint64_t position = 0;
+        bool negative = false;
         
         // Overenie znaku +/-
         if (str[0] == '+') {
@@ -73,7 +70,7 @@ public:
         }
         else if (str[0] == '-') {
             position = 1;
-            positive = false;
+            negative = true;
         }
 
         // Ak string ma iba jeden znak (znamienko)
@@ -82,7 +79,7 @@ public:
         }
 
         // Overenie, ze v stringu su iba cifry
-        for (int64_t i = position; i < str.size(); i++) {
+        for (size_t i = position; i < str.size(); i++) {
             if (!isdigit(str[i])) {
                 throw std::runtime_error("Only digit(s) allowed!");
             }
@@ -94,14 +91,15 @@ public:
         }
 
         // Vyhodnotenie leading 0
-        if (position >= str.size()) {
-            vv.push_back(0);
+        if (position == str.size()) {
+            this->vv.push_back(0);
+            this->zero = true;
             return;
         }
         std::string clean_string = str.substr(position);
 
         std::string part;
-        // Rozdelenie stringu od konca po castiach do vektora
+        // Rozdelenie stringu od konca, po castiach, do vektora
         for (int64_t i = clean_string.size(); i > 0; i -= DIGITS) {
             if (i <= DIGITS) {
                 part = clean_string.substr(0, i);
@@ -109,23 +107,94 @@ public:
             else {
                 part = clean_string.substr(i - DIGITS, DIGITS);
             }
-            vv.push_back(std::stoull(part));
+            this->vv.push_back(std::stoull(part));
         }
 
         // Ak je cislo zaporne
-        if (!positive) {
-            negative = true;
+        if (negative) {
+            this->negative = true;
         }
     };
     
     // copy
-    BigInteger(const BigInteger& other);
-    BigInteger& operator=(const BigInteger& rhs);
+    BigInteger(const BigInteger& other) = default; // BigInteger two = one;
+    BigInteger& operator=(const BigInteger& rhs) = default; // three = one;
+    
     // unary operators
-    const BigInteger& operator+() const;
-    BigInteger operator-() const;
+    const BigInteger& operator+() const { // x = +y
+        return *this;
+    };
+
+    BigInteger operator-() const { // x = -y
+        if (this->zero) {
+            return *this;
+        }
+        
+        BigInteger copied(*this);
+        if (this->negative) {
+            copied.negative = false;
+        }
+        else {
+            copied.negative = true;
+        }
+        
+        return copied;
+    };
+    
     // binary arithmetics operators
-    BigInteger& operator+=(const BigInteger& rhs);
+    BigInteger& operator+=(const BigInteger& rhs) {
+        if (rhs.zero) {
+            return *this;
+        }
+
+        if (this->zero) {
+            *this = rhs;
+            return *this;
+        }
+
+        bool result_positive = true;
+        // Identifikovanie 2 spravne pripady scitania (++ / --)
+        if (this->negative == rhs.negative) {
+            if (this->negative) {
+                result_positive = false;
+            }
+        }
+        // Identifikovanie pripadov odcitania (+- / -+)
+        // else {
+        //     if (this->negative) {
+        //         return;
+        //     }
+        //     else {
+        //         return;
+        //     }
+        // }
+
+        // Resize vektora na znamu velkost
+        this->vv.resize(std::max(this->vv.size(), rhs.vv.size()), 0);
+
+        uint64_t all = 0;
+        // Pripocitavanie aj 'rhs' pokial je, inak iba pripocitanie 'this' ku all
+        for (size_t i = 0; i < this->vv.size(); i++) {
+            if (i < rhs.vv.size()) {
+                all += rhs.vv[i];
+            }
+            all += this->vv[i];
+            this->vv[i] = all % MODULO;
+            all /= MODULO;
+        }
+
+        // Pridanie zvysku do vektora z posledneho scitania
+        if (all > 0) {
+            this->vv.push_back(all);
+        }
+        // Ak (--) tak vysledok musi byt zaporny 
+        if (!result_positive) {
+            this->negative = true;
+        }
+
+        return *this;
+    };
+
     BigInteger& operator-=(const BigInteger& rhs);
     BigInteger& operator*=(const BigInteger& rhs);
     BigInteger& operator/=(const BigInteger& rhs);
@@ -141,6 +210,7 @@ private:
     // public interface, also you can declare friends here if you want
     std::vector<uint64_t> vv;
     bool negative = false;
+    bool zero = false;
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
