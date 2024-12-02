@@ -230,11 +230,11 @@ private:
     friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
 };
 
-inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { return (lhs += rhs); };
-inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs) { return (lhs -= rhs); };
-inline BigInteger operator*(BigInteger lhs, const BigInteger& rhs) { return (lhs *= rhs); };
-inline BigInteger operator/(BigInteger lhs, const BigInteger& rhs) { return (lhs /= rhs); };
-inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs) { return (lhs %= rhs); };
+inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
+inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs) { lhs -= rhs; return lhs; };
+inline BigInteger operator*(BigInteger lhs, const BigInteger& rhs) { lhs *= rhs; return lhs; };
+inline BigInteger operator/(BigInteger lhs, const BigInteger& rhs) { lhs /= rhs; return lhs; };
+inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs) { lhs %= rhs; return lhs; };
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigInteger& lhs, const BigInteger& rhs);
