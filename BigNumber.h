@@ -116,10 +116,12 @@ public:
         }
     };
     
+
     // copy
     BigInteger(const BigInteger& other) = default; // BigInteger two = one;
     BigInteger& operator=(const BigInteger& rhs) = default; // three = one;
     
+
     // unary operators
     const BigInteger& operator+() const { // x = +y
         return *this;
@@ -140,6 +142,7 @@ public:
         
         return copied;
     };
+    
     
     // binary arithmetics operators
     BigInteger& operator+=(const BigInteger& rhs) {
@@ -211,23 +214,91 @@ private:
     std::vector<uint64_t> vv;
     bool negative = false;
     bool zero = false;
+
+
+    friend inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
+    friend inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
+    friend inline BigInteger operator*(BigInteger lhs, const BigInteger& rhs);
+    friend inline BigInteger operator/(BigInteger lhs, const BigInteger& rhs);
+    friend inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs);
+
+    friend inline bool operator==(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline bool operator!=(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline bool operator<(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline bool operator>(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline bool operator<=(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
 };
 
-inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
-inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
-inline BigInteger operator*(BigInteger lhs, const BigInteger& rhs);
-inline BigInteger operator/(BigInteger lhs, const BigInteger& rhs);
-inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs);
+inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { return (lhs += rhs); };
+inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs) { return (lhs -= rhs); };
+inline BigInteger operator*(BigInteger lhs, const BigInteger& rhs) { return (lhs *= rhs); };
+inline BigInteger operator/(BigInteger lhs, const BigInteger& rhs) { return (lhs /= rhs); };
+inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs) { return (lhs %= rhs); };
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigInteger& lhs, const BigInteger& rhs);
 // idea is, that all comparison should work, it is not important how you do it
-inline bool operator==(const BigInteger& lhs, const BigInteger& rhs);
-inline bool operator!=(const BigInteger& lhs, const BigInteger& rhs);
-inline bool operator<(const BigInteger& lhs, const BigInteger& rhs);
-inline bool operator>(const BigInteger& lhs, const BigInteger& rhs);
-inline bool operator<=(const BigInteger& lhs, const BigInteger& rhs);
-inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
+inline bool operator==(const BigInteger& lhs, const BigInteger& rhs) {
+    // Znamienka sa musia rovnat; Takisto vsetky cisla vo vektore a ich pocet sa musia rovnat
+    return ((lhs.negative == rhs.negative) && (lhs.vv == rhs.vv));
+};
+
+inline bool operator!=(const BigInteger& lhs, const BigInteger& rhs) {
+    // Spravime negaciu, cize 'lhs' sa musi rovnat 'rhs'; Samotna negacia musi byt znegovana, aby to platilo.
+    return !(lhs == rhs);
+};
+
+inline bool operator<(const BigInteger& lhs, const BigInteger& rhs) {
+    // Rozne znamienka; Samotna hodnota lhs.negative hovori vysledok
+    if (lhs.negative != rhs.negative) {
+        return lhs.negative;
+    }
+
+    // Rovnake znamienka; Rozne velkosti vektorov
+    if (lhs.vv.size() != rhs.vv.size()) {
+        // Ak cisla ZAPORNE, tak velkost vektora 'lhs' musi byt vacsia
+        if (lhs.negative) {
+            return (lhs.vv.size() > rhs.vv.size());
+        }
+        // Ak cisla KLADNE, tak velkost vektora 'lhs' musi byt mensia
+        else {
+            return (lhs.vv.size() < rhs.vv.size());
+        }
+    }
+
+    // Rovnake znamienka; Rovnake velkosti vektorov
+    for (int64_t i = lhs.vv.size() - 1; i >= 0; i--) {
+        // Ak su cisla rozne
+        if (lhs.vv[i] != rhs.vv[i]) {
+            // Ak cisla ZAPORNE, tak 'lhs' cislo musi byt vacsie
+            if (lhs.negative) {
+                return (lhs.vv[i] > rhs.vv[i]);
+            }
+            // Ak cisla KLADNE, tak 'lhs' cislo musi byt mensie
+            else {
+                return (lhs.vv[i] < rhs.vv[i]);
+            }
+        }
+    }
+
+    return false;
+};
+
+inline bool operator>(const BigInteger& lhs, const BigInteger& rhs) {
+    // Ak 'lhs' ma byt vacsie ako 'rhs', tak potom 'rhs' musi byt mensie ako 'lhs'
+    return (rhs < lhs);
+};
+
+inline bool operator<=(const BigInteger& lhs, const BigInteger& rhs) {
+    // Spravime negaciu, cize 'lhs' musi byt vacsie ako 'rhs'; Samotna negacia musi byt znegovana, aby to platilo.
+    return !(lhs > rhs);
+};
+
+inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs) {
+    // Spravime negaciu, cize 'lhs' musi byt mensie ako 'rhs'; Samotna negacia musi byt znegovana, aby to platilo.
+    return !(lhs < rhs);
+};
 
 inline std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
 
