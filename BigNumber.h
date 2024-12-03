@@ -20,13 +20,13 @@ class BigInteger
 public:
     // constructors
     BigInteger() {
-        this->vv.push_back(0);
+        this->numbers.push_back(0);
         this->zero = true;
     };
     
     BigInteger(int64_t n) {
         if (n == 0) {
-            this->vv.push_back(0);
+            this->numbers.push_back(0);
             this->zero = true;
             return;
         }
@@ -38,14 +38,14 @@ public:
 
         // Rychle vybavenie cisla pod limitom
         if (n < MODULO) {
-            this->vv.push_back(n);
+            this->numbers.push_back(n);
             return;
         }
 
         // Ak cislo nad limitom
         while (n != 0) {
             uint64_t nn = n % MODULO;
-            this->vv.push_back(nn);
+            this->numbers.push_back(nn);
             n /= MODULO;
         }
     };
@@ -81,7 +81,7 @@ public:
         // Overenie, ze v stringu su iba cifry
         for (size_t i = position; i < str.size(); i++) {
             if (!isdigit(str[i])) {
-                throw std::runtime_error("Only digit(s) allowed!");
+                throw std::runtime_error("Only digit(s) totalowed!");
             }
         }
 
@@ -92,7 +92,7 @@ public:
 
         // Vyhodnotenie leading 0
         if (position == str.size()) {
-            this->vv.push_back(0);
+            this->numbers.push_back(0);
             this->zero = true;
             return;
         }
@@ -107,7 +107,7 @@ public:
             else {
                 part = clean_string.substr(i - DIGITS, DIGITS);
             }
-            this->vv.push_back(std::stoull(part));
+            this->numbers.push_back(std::stoull(part));
         }
 
         // Ak je cislo zaporne
@@ -146,59 +146,117 @@ public:
     
     // binary arithmetics operators
     BigInteger& operator+=(const BigInteger& rhs) {
+        // Ak 'this' + 0
         if (rhs.zero) {
             return *this;
         }
-
+        // Ak 0 + 'rhs'
         if (this->zero) {
             *this = rhs;
             return *this;
         }
 
-        bool result_positive = true;
-        // Identifikovanie 2 spravne pripady scitania (++ / --)
-        if (this->negative == rhs.negative) {
-            if (this->negative) {
-                result_positive = false;
-            }
+        // ABY SA VYKONALO SCITANIE, ZNAMIENKA SA MUSIA ROVNAT
+        // Musi sa zavolat odcitanie; Nerovnost znamienok
+        if (this->negative != rhs.negative) {
+            *this -= -rhs;
+            return *this;
         }
-        // Identifikovanie pripadov odcitania (+- / -+)
-        // else {
-        //     if (this->negative) {
-        //         return;
-        //     }
-        //     else {
-        //         return;
-        //     }
-        // }
 
         // Resize vektora na znamu velkost
-        this->vv.resize(std::max(this->vv.size(), rhs.vv.size()), 0);
+        this->numbers.resize(std::max(this->numbers.size(), rhs.numbers.size()), 0);
 
-        uint64_t all = 0;
-        // Pripocitavanie aj 'rhs' pokial je, inak iba pripocitanie 'this' ku all
-        for (size_t i = 0; i < this->vv.size(); i++) {
-            if (i < rhs.vv.size()) {
-                all += rhs.vv[i];
+        uint64_t total = 0;
+        // Pripocitavanie aj 'rhs' pokial je, inak iba pripocitanie 'this' ku total
+        for (size_t i = 0; i < this->numbers.size(); i++) {
+            if (i < rhs.numbers.size()) {
+                total += rhs.numbers[i];
             }
-            all += this->vv[i];
-            this->vv[i] = all % MODULO;
-            all /= MODULO;
+            // Ak sa uz nepripocitava z 'rhs'
+            else {
+                // Identifikovanie mozneho predcasneho ukoncenie
+                if (total == 0) { break; }
+            }
+            total += this->numbers[i];
+            this->numbers[i] = total % MODULO;
+            total /= MODULO;
         }
 
         // Pridanie zvysku do vektora z posledneho scitania
-        if (all > 0) {
-            this->vv.push_back(all);
+        if (total > 0) {
+            this->numbers.push_back(total);
         }
-        // Ak (--) tak vysledok musi byt zaporny 
-        if (!result_positive) {
-            this->negative = true;
+    
+        return *this;
+    };
+
+    BigInteger& operator-=(const BigInteger& rhs) {
+        // Ak 'this' - 0
+        if (rhs.zero) {
+            return *this;
+        }
+        // Ak 0 - 'rhs'; Potreba zmenit znamienko
+        if (this->zero) {
+            *this = rhs;
+            this->negative = !(this->negative);
+            return *this;
+        }
+
+        // ABY SA VYKONALO ODCITANIE, ZNAMIENKA SA MUSIA ROVNAT
+        // Musi sa zavolat scitanie; Nerovnost znamienok
+        if (this->negative != rhs.negative) {
+            *this += -rhs;
+            return *this;
+        }
+
+        // Ak sa 'this' a 'rhs' rovnaju; Vysledok je 0
+        if (*this == rhs) {
+            this->numbers = {0};
+            this->negative = false;
+            this->zero = true;
+            return *this;
+        }
+
+        // 2 pripady, kedy sa odcitava vacsie od mensieho; Treba cisla prehodit a zmenit znamienko
+        if ((!this->negative && (*this < rhs)) || (this->negative && (*this > rhs))) {
+            *this = (rhs - *this);
+            this->negative = !(this->negative);
+            return *this;
+        }
+
+        uint64_t taking = 0;
+        // Odcitavanie 'taking' a 'rhs' pokial je
+        for (size_t i = 0; i < this->numbers.size(); i++) {
+            int64_t difference = this->numbers[i] - taking;
+            if (i < rhs.numbers.size()) {
+                difference -= rhs.numbers[i];
+            }
+            // Ak sa uz neodcitava z 'rhs'
+            else {
+                // Identifikovanie mozneho predcasneho ukoncenie
+                if (static_cast<uint64_t>(difference) == this->numbers[i]) {
+                    break;
+                }
+            }
+            // Musime odcitat 1 z nasledujuceho + opravit 'difference'
+            if (difference < 0) {
+                difference += MODULO;
+                taking = 1;
+            }
+            // Nemusime odcitat 1 z nasledujuceho
+            else { taking = 0; }
+            
+            this->numbers[i] = difference;
+        }
+
+        // Odstranenie zbytocnych 0 z konca vektora
+        while (this->numbers.back() == 0) {
+            this->numbers.pop_back();
         }
 
         return *this;
     };
 
-    BigInteger& operator-=(const BigInteger& rhs);
     BigInteger& operator*=(const BigInteger& rhs);
     BigInteger& operator/=(const BigInteger& rhs);
     BigInteger& operator%=(const BigInteger& rhs);
@@ -211,7 +269,7 @@ public:
 private:
     // here you can add private data and members, but do not add stuff to 
     // public interface, also you can declare friends here if you want
-    std::vector<uint64_t> vv;
+    std::vector<uint64_t> numbers;
     bool negative = false;
     bool zero = false;
 
@@ -238,10 +296,10 @@ inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs) { lhs %= rhs;
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigInteger& lhs, const BigInteger& rhs);
-// idea is, that all comparison should work, it is not important how you do it
+// idea is, that total comparison should work, it is not important how you do it
 inline bool operator==(const BigInteger& lhs, const BigInteger& rhs) {
     // Znamienka sa musia rovnat; Takisto vsetky cisla vo vektore a ich pocet sa musia rovnat
-    return ((lhs.negative == rhs.negative) && (lhs.vv == rhs.vv));
+    return ((lhs.negative == rhs.negative) && (lhs.numbers == rhs.numbers));
 };
 
 inline bool operator!=(const BigInteger& lhs, const BigInteger& rhs) {
@@ -256,28 +314,28 @@ inline bool operator<(const BigInteger& lhs, const BigInteger& rhs) {
     }
 
     // Rovnake znamienka; Rozne velkosti vektorov
-    if (lhs.vv.size() != rhs.vv.size()) {
+    if (lhs.numbers.size() != rhs.numbers.size()) {
         // Ak cisla ZAPORNE, tak velkost vektora 'lhs' musi byt vacsia
         if (lhs.negative) {
-            return (lhs.vv.size() > rhs.vv.size());
+            return (lhs.numbers.size() > rhs.numbers.size());
         }
         // Ak cisla KLADNE, tak velkost vektora 'lhs' musi byt mensia
         else {
-            return (lhs.vv.size() < rhs.vv.size());
+            return (lhs.numbers.size() < rhs.numbers.size());
         }
     }
 
     // Rovnake znamienka; Rovnake velkosti vektorov
-    for (int64_t i = lhs.vv.size() - 1; i >= 0; i--) {
+    for (int64_t i = lhs.numbers.size() - 1; i >= 0; i--) {
         // Ak su cisla rozne
-        if (lhs.vv[i] != rhs.vv[i]) {
+        if (lhs.numbers[i] != rhs.numbers[i]) {
             // Ak cisla ZAPORNE, tak 'lhs' cislo musi byt vacsie
             if (lhs.negative) {
-                return (lhs.vv[i] > rhs.vv[i]);
+                return (lhs.numbers[i] > rhs.numbers[i]);
             }
             // Ak cisla KLADNE, tak 'lhs' cislo musi byt mensie
             else {
-                return (lhs.vv[i] < rhs.vv[i]);
+                return (lhs.numbers[i] < rhs.numbers[i]);
             }
         }
     }
@@ -344,7 +402,7 @@ inline BigRational operator/(BigRational lhs, const BigRational& rhs);
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigRational& lhs, const BigRational& rhs);
-// idea is, that all comparison should work, it is not important how you do it
+// idea is, that total comparison should work, it is not important how you do it
 inline bool operator==(const BigRational& lhs, const BigRational& rhs);
 inline bool operator!=(const BigRational& lhs, const BigRational& rhs);
 inline bool operator<(const BigRational& lhs, const BigRational& rhs);
