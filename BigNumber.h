@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
+#include <iomanip>
 
 // if you do not plan to implement bonus, you can delete those lines
 // or just keep them as is and do not define the macro to 1
@@ -56,8 +57,8 @@ public:
             throw std::runtime_error("Empty string!");
         }
 
-        //! Zachytenie medzier v stringu | MOZNO POUZIT std::isspace()
-        if (str.front() == ' ' || str.back() == ' ') {
+        // Ak sa maju overit iba ' ', tak staci iba: str.front/back() == ' '
+        if (std::isspace(str.front()) || std::isspace(str.back())) {
             throw std::runtime_error("White space(s) in string!");
         }
 
@@ -81,7 +82,7 @@ public:
         // Overenie, ze v stringu su iba cifry
         for (size_t i = position; i < str.size(); i++) {
             if (!isdigit(str[i])) {
-                throw std::runtime_error("Only digit(s) totalowed!");
+                throw std::runtime_error("Only digit(s) carryowed!");
             }
         }
 
@@ -166,25 +167,25 @@ public:
         // Resize vektora na znamu velkost
         this->numbers.resize(std::max(this->numbers.size(), rhs.numbers.size()), 0);
 
-        uint64_t total = 0;
-        // Pripocitavanie aj 'rhs' pokial je, inak iba pripocitanie 'this' ku total
+        uint64_t carrying = 0;
+        // Pripocitavanie aj 'rhs' pokial je, inak iba pripocitanie 'this' ku carrying
         for (size_t i = 0; i < this->numbers.size(); i++) {
             if (i < rhs.numbers.size()) {
-                total += rhs.numbers[i];
+                carrying += rhs.numbers[i];
             }
             // Ak sa uz nepripocitava z 'rhs'
             else {
                 // Identifikovanie mozneho predcasneho ukoncenie
-                if (total == 0) { break; }
+                if (carrying == 0) { break; }
             }
-            total += this->numbers[i];
-            this->numbers[i] = total % MODULO;
-            total /= MODULO;
+            carrying += this->numbers[i];
+            this->numbers[i] = carrying % MODULO;
+            carrying /= MODULO;
         }
 
         // Pridanie zvysku do vektora z posledneho scitania
-        if (total > 0) {
-            this->numbers.push_back(total);
+        if (carrying > 0) {
+            this->numbers.push_back(carrying);
         }
     
         return *this;
@@ -257,7 +258,52 @@ public:
         return *this;
     };
 
-    BigInteger& operator*=(const BigInteger& rhs);
+    BigInteger& operator*=(const BigInteger& rhs) {
+        // Ak je jedno z cisel 0
+        if (this->zero || rhs.zero) {
+            this->numbers = {0};
+            this->negative = false;
+            this->zero = true;
+            return *this;
+        }
+
+        // Vytvorenie noveho vektora na ukladanie medzivysledkov
+        std::vector<uint64_t> storage(this->numbers.size() + rhs.numbers.size(), 0);
+
+        // Loop, ktory berie kazde cislo z 'this'
+        for (size_t i = 0; i < this->numbers.size(); i++) {
+            // Nasobenie 0-lou nema ziadny efekt na vysledok
+            if (this->numbers[i] == 0) { continue; }
+            
+            uint64_t carrying = 0;
+
+            // Loop, ktory nasobi kazde 'rhs' s aktualnym 'this'
+            for (size_t j = 0; (j < rhs.numbers.size() || carrying > 0); j++) {
+                // Aktualna hodnota indexu + co sa prenasa
+                uint64_t total = storage[i+j] + carrying;
+                
+                // Klasicke nasobenie (kazde s kazdym); Na oddelenie, ak na konci nasobeni zostanu prebytocne zvysky, ktore treba spracovat osobitne
+                if (j < rhs.numbers.size()) {
+                    total +=  (this->numbers[i] * rhs.numbers[j]);
+                }
+
+                storage[i+j] = total % MODULO;
+                carrying = total / MODULO;
+            }
+        }
+
+        // Odstranenie zbytocnych 0 z konca vektora
+        while (storage.back() == 0) {
+            storage.pop_back();
+        }
+
+        // Priradenie spravneho vektora a nastavenie znamienka
+        this->numbers = storage;
+        this->negative = !(this->negative == rhs.negative);
+
+        return *this;
+    };
+
     BigInteger& operator/=(const BigInteger& rhs);
     BigInteger& operator%=(const BigInteger& rhs);
 
@@ -286,6 +332,8 @@ private:
     friend inline bool operator>(const BigInteger& lhs, const BigInteger& rhs);
     friend inline bool operator<=(const BigInteger& lhs, const BigInteger& rhs);
     friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
+
+    friend std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -296,7 +344,7 @@ inline BigInteger operator%(BigInteger lhs, const BigInteger& rhs) { lhs %= rhs;
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigInteger& lhs, const BigInteger& rhs);
-// idea is, that total comparison should work, it is not important how you do it
+// idea is, that carry comparison should work, it is not important how you do it
 inline bool operator==(const BigInteger& lhs, const BigInteger& rhs) {
     // Znamienka sa musia rovnat; Takisto vsetky cisla vo vektore a ich pocet sa musia rovnat
     return ((lhs.negative == rhs.negative) && (lhs.numbers == rhs.numbers));
@@ -358,7 +406,28 @@ inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs) {
     return !(lhs < rhs);
 };
 
-inline std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
+inline std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs) {
+    // Ak cislo je 0
+    if (rhs.zero) {
+        lhs << 0;
+        return lhs;
+    }
+    
+    // Ak cislo zaporne, tak vypis znamienka
+    if (rhs.negative) {
+        lhs << '-';
+    }
+
+    // Posledna, respektive prva cast cisla sa vypise bez prefixovych 0-ul
+    lhs << rhs.numbers.back();
+    // Vsetky dalsie casti cisla na vypise aj s prefixovymi 0-mi
+    for (int64_t i = rhs.numbers.size() - 2; i >= 0; i--) {
+        lhs << std::setw(9) << std::setfill('0') << rhs.numbers[i];
+    }
+
+    return lhs;
+
+};
 
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
@@ -402,7 +471,7 @@ inline BigRational operator/(BigRational lhs, const BigRational& rhs);
 
 // alternatively you can implement 
 // std::strong_ordering operator<=>(const BigRational& lhs, const BigRational& rhs);
-// idea is, that total comparison should work, it is not important how you do it
+// idea is, that carry comparison should work, it is not important how you do it
 inline bool operator==(const BigRational& lhs, const BigRational& rhs);
 inline bool operator!=(const BigRational& lhs, const BigRational& rhs);
 inline bool operator<(const BigRational& lhs, const BigRational& rhs);
