@@ -304,7 +304,78 @@ public:
         return *this;
     };
 
-    BigInteger& operator/=(const BigInteger& rhs);
+    BigInteger& operator/=(const BigInteger& rhs) {
+        // Ak A/0
+        if (rhs.zero) {
+            throw std::runtime_error("Dividing by 0!");
+        }
+        // Ak 0/B 
+        if (this->zero) {
+            return *this;
+        }
+        
+        // Nastvanenie spravneho znamienka
+        this->negative = !(this->negative == rhs.negative);
+
+        // Ak A/1
+        if ((rhs.numbers.size() == 1) && (rhs.numbers[0] == 1)) {
+            return *this;
+        }
+        // Ak A/B, kde A = B
+        if (this->numbers == rhs.numbers) {
+            this->numbers = {1};
+            return *this;
+        }
+        // Ak A/B, kde A < B
+        if (FirstSmaller(*this, rhs)) {
+            this->numbers = {0};
+            this->negative = false;
+            this->zero = true;
+            return *this;
+        }
+
+        // Ulozenie znamienka a zmena na 'false' (kladne)
+        bool this_negative = this->negative;
+        this->negative = false;
+
+        // Vytvorenie kopie a zmena znamienka na 'false'
+        BigInteger divisor = rhs;
+        divisor.negative = false;
+
+        // Vytvorenie konstanty pre nasobenie a buduceho vysledku
+        BigInteger constant(2);
+        BigInteger answer(0);
+
+        // Kedze toto je implementacia delenia, musim hodnoty uchovat do vektora, aby som sa k nim mohol vratit
+        std::vector<BigInteger> denom = {divisor};
+        std::vector<BigInteger> current = {BigInteger(1)};
+
+        int64_t index = 0;
+        // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
+        while (denom[index] <= *this) {
+            denom.push_back(denom[index] * constant);
+            current.push_back(current[index] * constant);
+            index++;
+        }
+        index--;
+
+        // Proces pocitania vysledku a zvysku zaroven
+        while (index >= 0) {
+            if (*this >= denom[index]) {
+                *this -= denom[index];
+                answer += current[index];
+            }
+            index--;
+        }
+
+        // Ulozenie vysledku a spravne nastavenie 'this' parametrov
+        *this = answer;
+        this->zero = (this->numbers.size() == 1 && this->numbers[0] == 0);
+        this->negative = this->zero ? false : this_negative;
+
+        return *this;
+    };
+
     BigInteger& operator%=(const BigInteger& rhs);
 
     double sqrt() const;
@@ -332,8 +403,9 @@ private:
     friend inline bool operator>(const BigInteger& lhs, const BigInteger& rhs);
     friend inline bool operator<=(const BigInteger& lhs, const BigInteger& rhs);
     friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
-
     friend std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
+
+    friend inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -427,6 +499,25 @@ inline std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs) {
 
     return lhs;
 
+};
+
+
+inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs) {
+    // Znamienka sa neberu do uvahy!
+    // Rozne velkosti vektorov
+    if (lhs.numbers.size() != rhs.numbers.size()) {
+        return (lhs.numbers.size() < rhs.numbers.size());
+    }
+
+    // Rovnake velkosti vektorov
+    for (int64_t i = lhs.numbers.size() - 1; i >= 0; i--) {
+        // Ak su cisla rozne
+        if (lhs.numbers[i] != rhs.numbers[i]) {
+            return (lhs.numbers[i] < rhs.numbers[i]);
+        }
+    }
+
+    return false;
 };
 
 #if SUPPORT_IFSTREAM == 1
