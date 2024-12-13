@@ -45,8 +45,8 @@ public:
 
         // Ak cislo nad limitom
         while (n != 0) {
-            uint64_t nn = n % MODULO;
-            this->numbers.push_back(nn);
+            //uint64_t nn = n % MODULO;
+            this->numbers.push_back(n % MODULO);
             n /= MODULO;
         }
     };
@@ -86,18 +86,16 @@ public:
             }
         }
 
-        // Hladanie leading 0
-        while ((position < str.size()) && (str[position] == '0')) {
-            position++;
-        }
+        // Hladanie prveho nenuloveho znaku
+        size_t non_zero_position = str.find_first_not_of('0', position);
 
-        // Vyhodnotenie leading 0
-        if (position == str.size()) {
+        // Ak same 0 v stringu
+        if (non_zero_position == std::string::npos) {
             this->numbers.push_back(0);
             this->zero = true;
             return;
         }
-        std::string clean_string = str.substr(position);
+        std::string clean_string = str.substr(non_zero_position);
 
         std::string part;
         // Rozdelenie stringu od konca, po castiach, do vektora
@@ -111,15 +109,20 @@ public:
             this->numbers.push_back(std::stoull(part));
         }
 
-        // Ak je cislo zaporne
-        if (negative) {
-            this->negative = true;
-        }
+        // Priradenie znamienka
+        this->negative = negative;
     };
     
+    // MOVE
+    BigInteger(BigInteger&& other) noexcept {
+        this->numbers = std::move(other.numbers);
+        this->negative = other.negative;
+        this->zero = other.zero;
+    }
+
 
     // copy
-    BigInteger(const BigInteger& other) = default; // BigInteger two = one;
+    BigInteger(const BigInteger& other) = default; // BigInteger two(one);
     BigInteger& operator=(const BigInteger& rhs) = default; // three = one;
     
 
@@ -133,13 +136,9 @@ public:
             return *this;
         }
         
-        BigInteger copied(*this);
-        if (this->negative) {
-            copied.negative = false;
-        }
-        else {
-            copied.negative = true;
-        }
+        // Potreba vytvorenia noveho objektu + zmena znamienka
+        BigInteger copied = *this;
+        copied.negative = !(this->negative);
         
         return copied;
     };
@@ -267,6 +266,19 @@ public:
             return *this;
         }
 
+        // Nastavenie spravneho znamienka
+        this->negative = !(this->negative == rhs.negative);
+
+        // Ak 1*B
+        if (this->numbers.size() == 1 && this->numbers[0] == 1) {
+            *this = rhs;
+            return *this;
+        }
+        // Ak A*1
+        if (rhs.numbers.size() == 1 && rhs.numbers[0] == 1) {
+            return *this;
+        }
+
         // Vytvorenie noveho vektora na ukladanie medzivysledkov
         std::vector<uint64_t> storage(this->numbers.size() + rhs.numbers.size(), 0);
 
@@ -297,10 +309,9 @@ public:
             storage.pop_back();
         }
 
-        // Priradenie spravneho vektora a nastavenie znamienka
-        this->numbers = storage;
-        this->negative = !(this->negative == rhs.negative);
-
+        // Priradenie vysledneho vektora
+        this->numbers = std::move(storage);
+        
         return *this;
     };
 
@@ -338,17 +349,19 @@ public:
         bool this_negative = this->negative;
         this->negative = false;
 
-        // Vytvorenie kopie a zmena znamienka na 'false'
-        BigInteger divisor = rhs;
-        divisor.negative = false;
-
-        // Vytvorenie konstanty pre nasobenie a buduceho vysledku
+        // Vytvorenie konstanty pre nasobenie + buduceho vysledku
         BigInteger constant(2);
         BigInteger answer(0);
 
         // Kedze toto je implementacia delenia, musim hodnoty uchovat do vektora, aby som sa k nim mohol vratit
-        std::vector<BigInteger> denom = {divisor};
-        std::vector<BigInteger> current = {BigInteger(1)};
+        // Pridanie kopie 'rhs' do vektora + nastavenie znamienka
+        std::vector<BigInteger> denom;
+        denom.push_back(rhs);
+        denom[0].negative = false;
+        
+        // Priame vytvorenie objektu do vektora
+        std::vector<BigInteger> current;
+        current.emplace_back(1);
 
         int64_t index = 0;
         // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
@@ -368,15 +381,71 @@ public:
             index--;
         }
 
-        // Ulozenie vysledku a spravne nastavenie 'this' parametrov
-        *this = answer;
+        // Presun vysledku a spravne nastavenie 'this' parametrov
+        this->numbers = std::move(answer.numbers);
         this->zero = (this->numbers.size() == 1 && this->numbers[0] == 0);
         this->negative = this->zero ? false : this_negative;
 
         return *this;
     };
 
-    BigInteger& operator%=(const BigInteger& rhs);
+    BigInteger& operator%=(const BigInteger& rhs) {
+        // Ak A%0
+        if (rhs.zero) {
+            throw std::runtime_error("Modulling by 0!");
+        }
+        // Ak 0%B 
+        if (this->zero) {
+            return *this;
+        }
+        // Ak A%1 alebo A%B, kde A = B
+        if (((rhs.numbers.size() == 1) && (rhs.numbers[0] == 1)) || (this->numbers == rhs.numbers)) {
+            this->numbers = {0};
+            this->negative = false;
+            this->zero = true;
+            return *this;
+        }
+        // Ak A%B, kde A < B; Da sa vyhodnotit aj cez '*this' < 'rhs'...
+        if (FirstSmaller(*this, rhs)) {
+            return *this;
+        }
+
+        // Vytvorenie konstanty pre nasobenie, buduceho vysledku
+        BigInteger constant(2);
+        BigInteger answer(0);
+
+        // Kedze implementaciu delenia uz existuje, nemusia sa ukladat vysledky do vektorov, lebo sa daju spatne vypocitat, ale CAS!!!
+        // Pridanie kopie 'rhs' do vektora
+        std::vector<BigInteger> denom;
+        denom.push_back(rhs);
+        
+        // Vytvorenie objektu cisto vo vektore
+        std::vector<BigInteger> current;
+        current.emplace_back(1);
+
+        int64_t index = 0;
+        // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
+        while (denom[index] <= *this) {
+            denom.push_back(denom[index] * constant);
+            current.push_back(current[index] * constant);
+            index++;
+        }
+        index--;
+
+        // Proces pocitania vysledku a zvysku zaroven
+        while (index >= 0) {
+            if (*this >= denom[index]) {
+                *this -= denom[index];
+                answer += current[index];
+            }
+            index--;
+        }
+
+        // Vysledok je priamo v 'this'; Len nastavenie 'zero'
+        this->zero = (this->numbers.size() == 1 && this->numbers[0] == 0);
+
+        return *this;
+    };
 
     double sqrt() const;
 #if SUPPORT_MORE_OPS == 1
