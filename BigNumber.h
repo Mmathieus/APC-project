@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <iomanip>
+#include <utility>
 
 // if you do not plan to implement bonus, you can delete those lines
 // or just keep them as is and do not define the macro to 1
@@ -325,8 +326,8 @@ public:
             return *this;
         }
         
-        // Nastvanenie spravneho znamienka
-        this->negative = !(this->negative == rhs.negative);
+        // // Nastvanenie spravneho znamienka
+        // this->negative = !(this->negative == rhs.negative);
 
         // Ak A/1
         if ((rhs.numbers.size() == 1) && (rhs.numbers[0] == 1)) {
@@ -345,46 +346,14 @@ public:
             return *this;
         }
 
-        // Ulozenie znamienka a zmena na 'false' (kladne)
-        bool this_negative = this->negative;
-        this->negative = false;
+        // // Ulozenie znamienka a zmena na 'false' (kladne)
+        // bool this_negative = this->negative;
+        // this->negative = false;
 
-        // Vytvorenie konstanty pre nasobenie + buduceho vysledku
-        BigInteger constant(2);
-        BigInteger answer(0);
+        // // Presun vysledku a spravne nastavenie 'this' parametrov
+        // this->negative = this->zero ? false : this_negative;
 
-        // Kedze toto je implementacia delenia, musim hodnoty uchovat do vektora, aby som sa k nim mohol vratit
-        // Pridanie kopie 'rhs' do vektora + nastavenie znamienka
-        std::vector<BigInteger> denom;
-        denom.push_back(rhs);
-        denom[0].negative = false;
-        
-        // Priame vytvorenie objektu do vektora
-        std::vector<BigInteger> current;
-        current.emplace_back(1);
-
-        int64_t index = 0;
-        // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
-        while (denom[index] <= *this) {
-            denom.push_back(denom[index] * constant);
-            current.push_back(current[index] * constant);
-            index++;
-        }
-        index--;
-
-        // Proces pocitania vysledku a zvysku zaroven
-        while (index >= 0) {
-            if (*this >= denom[index]) {
-                *this -= denom[index];
-                answer += current[index];
-            }
-            index--;
-        }
-
-        // Presun vysledku a spravne nastavenie 'this' parametrov
-        this->numbers = std::move(answer.numbers);
-        this->zero = (this->numbers.size() == 1 && this->numbers[0] == 0);
-        this->negative = this->zero ? false : this_negative;
+        DivisionModuloLogic(*this, rhs, true);
 
         return *this;
     };
@@ -410,39 +379,7 @@ public:
             return *this;
         }
 
-        // Vytvorenie konstanty pre nasobenie, buduceho vysledku
-        BigInteger constant(2);
-        BigInteger answer(0);
-
-        // Kedze implementaciu delenia uz existuje, nemusia sa ukladat vysledky do vektorov, lebo sa daju spatne vypocitat, ale CAS!!!
-        // Pridanie kopie 'rhs' do vektora
-        std::vector<BigInteger> denom;
-        denom.push_back(rhs);
-        
-        // Vytvorenie objektu cisto vo vektore
-        std::vector<BigInteger> current;
-        current.emplace_back(1);
-
-        int64_t index = 0;
-        // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
-        while (denom[index] <= *this) {
-            denom.push_back(denom[index] * constant);
-            current.push_back(current[index] * constant);
-            index++;
-        }
-        index--;
-
-        // Proces pocitania vysledku a zvysku zaroven
-        while (index >= 0) {
-            if (*this >= denom[index]) {
-                *this -= denom[index];
-                answer += current[index];
-            }
-            index--;
-        }
-
-        // Vysledok je priamo v 'this'; Len nastavenie 'zero'
-        this->zero = (this->numbers.size() == 1 && this->numbers[0] == 0);
+        DivisionModuloLogic(*this, rhs, false);
 
         return *this;
     };
@@ -475,6 +412,7 @@ private:
     friend std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
 
     friend inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -588,6 +526,49 @@ inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs) {
 
     return false;
 };
+
+inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison) {
+    // Vytvorenie konstanty pre nasobenie, buduceho vysledku
+    BigInteger constant(2);
+    BigInteger answer(0);
+
+    // Kedze toto je implementacia delenia/modula, hodnoty treba uchovat do vektora, aby sa k nim mohlo vratit
+    // Pridanie kopie 'rhs' do vektora
+    std::vector<BigInteger> denom;
+    denom.push_back(rhs);
+    //denom[0].negative = false;
+    
+    // Priame vytvorenie objektu do vektora
+    std::vector<BigInteger> current;
+    current.emplace_back(1);
+
+    int64_t index = 0;
+    // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
+    while (denom[index] <= lhs) {
+        denom.push_back(denom[index] * constant);
+        current.push_back(current[index] * constant);
+        index++;
+    }
+    index--;
+
+    // Proces pocitania vysledku a zvysku zaroven
+    while (index >= 0) {
+        if (lhs >= denom[index]) {
+            lhs -= denom[index];
+            answer += current[index];
+        }
+        index--;
+    }
+
+    // Presun vektora ak ide o /; Pri % je vysledok uz priamo ulozeny v 'this'
+    if (divison) {
+        lhs.numbers = std::move(answer.numbers);
+    }
+    // Nastavenie 'zero' pre oba pripady
+    lhs.zero = (lhs.numbers.size() == 1 && lhs.numbers[0] == 0);
+
+    return;
+}
 
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
