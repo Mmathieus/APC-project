@@ -1,12 +1,13 @@
 #pragma once
 // here you can include whatever you want :)
 #include <string>
-#include <stdint.h>
-#include <vector>
 #include <cstdint>
+#include <vector>
 #include <stdexcept>
 #include <iomanip>
 #include <utility>
+#include <limits>
+#include <cmath>
 
 // if you do not plan to implement bonus, you can delete those lines
 // or just keep them as is and do not define the macro to 1
@@ -55,12 +56,12 @@ public:
     explicit BigInteger(const std::string& str) {
         // Zachytenie prazdneho stringu
         if (str.empty()) {
-            throw std::runtime_error("Empty string!");
+            throw std::runtime_error("Empty BigInteger!");
         }
 
         // Ak sa maju overit iba ' ', tak staci iba: str.front/back() == ' '
         if (std::isspace(str.front()) || std::isspace(str.back())) {
-            throw std::runtime_error("White space(s) in string!");
+            throw std::runtime_error("White space(s) in BigInteger!");
         }
 
         uint64_t position = 0;
@@ -77,13 +78,13 @@ public:
 
         // Ak string ma iba jeden znak (znamienko)
         if (position == str.size()) {
-            throw std::runtime_error("No digit(s) in string!");
+            throw std::runtime_error("No digit(s) in BigInteger!");
         }
 
         // Overenie, ze v stringu su iba cifry
         for (size_t i = position; i < str.size(); i++) {
             if (!isdigit(str[i])) {
-                throw std::runtime_error("Only digit(s) carryowed!");
+                throw std::runtime_error("Only digit(s) allowed in BigInteger!");
             }
         }
 
@@ -128,11 +129,11 @@ public:
     
 
     // unary operators
-    const BigInteger& operator+() const { // x = +y
+    const BigInteger& operator+() const {
         return *this;
     };
 
-    BigInteger operator-() const { // x = -y
+    BigInteger operator-() const {
         if (this->zero) {
             return *this;
         }
@@ -384,7 +385,32 @@ public:
         return *this;
     };
 
-    double sqrt() const;
+    double sqrt() const {
+        // Ak zaporne cislo
+        if (this->negative) {
+            throw std::runtime_error("No SQRT of negative BigInteger");
+        }
+        // Ak sqrt(0)
+        if (this->zero) {
+            return 0;
+        }
+        // Ak sqrt(1)
+        if (this->numbers.size() == 1 && this->numbers[0] == 1) {
+            return 1;
+        }
+
+        double converted = 0;
+        // Overenie overflowu pre kazde cislo a nasledna konverzia na double
+        for (auto iterator = this->numbers.rbegin(); iterator != this->numbers.rend(); iterator++) {
+            if (((converted * MODULO) + *iterator) > std::numeric_limits<double>::max()) {
+                throw std::runtime_error("BigInteger too big!");
+            }
+            converted = (converted * MODULO) + *iterator;
+        }
+
+        return std::sqrt(converted);
+    };
+
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const;
     bool is_prime(size_t k) const; // use rabbin-miller test with k rounds
