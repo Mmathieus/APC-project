@@ -22,38 +22,46 @@ class BigInteger
 {
 public:
     // constructors
-    BigInteger() {
-        this->numbers.push_back(0);
-        this->zero = true;
-    };
+    BigInteger()
+        : numbers{0}
+        , negative(false)
+        , zero(true)
+    {
+        //std::cout << "BigInteger default created\n";
+    }
     
-    BigInteger(int64_t n) {
+    BigInteger(int64_t n)
+        : numbers()
+        , negative(false)
+        , zero(false)
+    {   
+        //std::cout << "BigInteger from INT created\n";
         if (n == 0) {
-            this->numbers.push_back(0);
+            numbers.push_back(0);
             this->zero = true;
             return;
         }
-
         if (n < 0) {
             this->negative = true;
             n = -n;
         }
-
-        // Rychle vybavenie cisla pod limitom
+        // Rýchle vybavenie čísla pod limitom
         if (n < MODULO) {
-            this->numbers.push_back(n);
+            numbers.push_back(n);
             return;
         }
-
-        // Ak cislo nad limitom
+        // Ak číslo presahuje limit MODULO
         while (n != 0) {
-            //uint64_t nn = n % MODULO;
-            this->numbers.push_back(n % MODULO);
+            numbers.push_back(n % MODULO);
             n /= MODULO;
         }
-    };
+    }
     
-    explicit BigInteger(const std::string& str) {
+    explicit BigInteger(const std::string& str)
+        : numbers()
+        , negative(false)
+        , zero(false)
+    {
         // Zachytenie prazdneho stringu
         if (str.empty()) {
             throw std::runtime_error("Empty BigInteger!");
@@ -116,10 +124,14 @@ public:
     };
     
     // MOVE
-    BigInteger(BigInteger&& other) noexcept {
-        this->numbers = std::move(other.numbers);
-        this->negative = other.negative;
-        this->zero = other.zero;
+    BigInteger(BigInteger&& other) noexcept
+        : numbers(std::move(other.numbers))
+        , negative(other.negative)
+        , zero(other.zero)
+    {
+        //std::cout << "BigInteger MOVE\n";
+        other.negative = false;
+        other.zero = false;
     }
 
 
@@ -137,7 +149,6 @@ public:
         if (this->zero) {
             return *this;
         }
-        
         // Potreba vytvorenia noveho objektu + zmena znamienka
         BigInteger copied = *this;
         copied.negative = !(this->negative);
@@ -411,6 +422,7 @@ public:
         return std::sqrt(converted);
     };
 
+
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const;
     bool is_prime(size_t k) const; // use rabbin-miller test with k rounds
@@ -419,9 +431,8 @@ private:
     // here you can add private data and members, but do not add stuff to 
     // public interface, also you can declare friends here if you want
     std::vector<uint64_t> numbers;
-    bool negative = false;
-    bool zero = false;
-
+    bool negative;
+    bool zero;
 
     friend inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
     friend inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
@@ -556,16 +567,18 @@ inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs) {
 inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison) {
     // Vytvorenie konstanty pre nasobenie, buduceho vysledku
     BigInteger constant(2);
-    BigInteger answer(0);
+    BigInteger answer;
 
     // Kedze toto je implementacia delenia/modula, hodnoty treba uchovat do vektora, aby sa k nim mohlo vratit
     // Pridanie kopie 'rhs' do vektora
     std::vector<BigInteger> denom;
+    denom.reserve(5);
     denom.push_back(rhs);
     //denom[0].negative = false;
     
     // Priame vytvorenie objektu do vektora
     std::vector<BigInteger> current;
+    current.reserve(5);
     current.emplace_back(1);
 
     int64_t index = 0;
@@ -596,6 +609,7 @@ inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool div
     return;
 }
 
+
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
 // whitespace, consumed characters etc...
@@ -607,12 +621,21 @@ class BigRational
 {
 public:
     // constructors
-    BigRational();
+    BigRational()
+        : numerator(0)
+        , denominator(1)
+        , negative(false)
+    {
+        //std::cout << "BigRational created\n";
+    }
+
     BigRational(int64_t a, int64_t b);
     BigRational(const std::string& a, const std::string& b);
+    
     // copy
-    BigRational(const BigRational& other);
-    BigRational& operator=(const BigRational& rhs);
+    BigRational(const BigRational& other) = default;
+    BigRational& operator=(const BigRational& rhs) = default;
+    
     // unary operators
     const BigRational& operator+() const;
     BigRational operator-() const;
@@ -629,6 +652,9 @@ public:
 private:
     // here you can add private data and members, but do not add stuff to 
     // public interface, also you can declare friends here if you want
+    BigInteger numerator;
+    BigInteger denominator;
+    bool negative;
 };
 
 inline BigRational operator+(BigRational lhs, const BigRational& rhs);
