@@ -27,7 +27,7 @@ public:
         , negative(false)
         , zero(true)
     {
-        //std::cout << "BigInteger default created\n";
+        std::cout << "BigInteger default created\n";
     }
     
     BigInteger(int64_t n)
@@ -35,7 +35,7 @@ public:
         , negative(false)
         , zero(false)
     {   
-        //std::cout << "BigInteger from INT created\n";
+        std::cout << "BigInteger from INT created\n";
         if (n == 0) {
             numbers.push_back(0);
             this->zero = true;
@@ -129,15 +129,31 @@ public:
         , negative(other.negative)
         , zero(other.zero)
     {
-        //std::cout << "BigInteger MOVE\n";
+        std::cout << "BigInteger MOVE\n";
         other.negative = false;
         other.zero = false;
     }
 
 
     // copy
-    BigInteger(const BigInteger& other) = default; // BigInteger two(one);
-    BigInteger& operator=(const BigInteger& rhs) = default; // three = one;
+    BigInteger(const BigInteger& other)
+        : numbers(other.numbers)
+        , negative(other.negative)
+        , zero(other.zero)
+    {
+        std::cout << "BigInteger COPY inicializacia\n";
+    }
+    
+    BigInteger& operator=(const BigInteger& rhs) {
+        if (*this != rhs) {
+            this->numbers = rhs.numbers;
+            this->negative = rhs.negative;
+            this->zero = rhs.zero;
+        }
+        std::cout << "BigInteger COPY priradenie\n";
+    
+        return *this;
+    }
     
 
     // unary operators
@@ -353,7 +369,6 @@ public:
         // Ak A/B, kde A < B
         if (FirstSmaller(*this, rhs)) {
             this->numbers = {0};
-            this->negative = false;
             this->zero = true;
             return *this;
         }
@@ -584,8 +599,8 @@ inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool div
     int64_t index = 0;
     // Ukladanie hodnot 'denom' a 'current' az do platnosti podmienky
     while (denom[index] <= lhs) {
-        denom.push_back(denom[index] * constant);
-        current.push_back(current[index] * constant);
+        denom.push_back(constant * denom[index]);
+        current.push_back(constant * current[index]);
         index++;
     }
     index--;
