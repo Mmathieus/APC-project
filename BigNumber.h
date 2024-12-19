@@ -27,7 +27,7 @@ public:
         , negative(false)
         , zero(true)
     {
-        std::cout << "BigInteger default created\n";
+        //std::cout << "BigInteger default created\n";
     }
     
     BigInteger(int64_t n)
@@ -35,12 +35,13 @@ public:
         , negative(false)
         , zero(false)
     {   
-        std::cout << "BigInteger from INT created\n";
+        //std::cout << "BigInteger from INT created\n";
         if (n == 0) {
             numbers.push_back(0);
             this->zero = true;
             return;
         }
+        // Ulozenie zaporneho znamienka
         if (n < 0) {
             this->negative = true;
             n = -n;
@@ -123,13 +124,13 @@ public:
         this->negative = negative;
     };
     
-    // MOVE
+    // move
     BigInteger(BigInteger&& other) noexcept
         : numbers(std::move(other.numbers))
         , negative(other.negative)
         , zero(other.zero)
     {
-        std::cout << "BigInteger MOVE\n";
+        //std::cout << "BigInteger MOVE\n";
         other.negative = false;
         other.zero = false;
     }
@@ -141,16 +142,27 @@ public:
         , negative(other.negative)
         , zero(other.zero)
     {
-        std::cout << "BigInteger COPY inicializacia\n";
+        //std::cout << "BigInteger COPY\n";
     }
     
     BigInteger& operator=(const BigInteger& rhs) {
-        if (*this != rhs) {
-            this->numbers = rhs.numbers;
-            this->negative = rhs.negative;
-            this->zero = rhs.zero;
+        // Ide o ten isty objekt
+        if (this == &rhs) {
+            //std::cout << "BigInteger COPY NO\n";
+            return *this;
         }
-        std::cout << "BigInteger COPY priradenie\n";
+        // Ak sa cisla rovanaju
+        if (this->numbers == rhs.numbers) {
+            this->negative = rhs.negative;
+            //std::cout << "BigInteger COPY only negative\n";
+            return *this;
+        }
+        // Cisla sa nerovnaju -> komplet kopirovanie
+        this->numbers = rhs.numbers;
+        this->negative = rhs.negative;
+        this->zero = rhs.zero;
+        
+        //std::cout << "BigInteger COPY\n";
     
         return *this;
     }
@@ -240,9 +252,7 @@ public:
 
         // Ak sa 'this' a 'rhs' rovnaju; Vysledok je 0
         if (*this == rhs) {
-            this->numbers = {0};
-            this->negative = false;
-            this->zero = true;
+            SetToZero(*this);
             return *this;
         }
 
@@ -287,14 +297,15 @@ public:
     };
 
     BigInteger& operator*=(const BigInteger& rhs) {
-        // Ak je jedno z cisel 0
-        if (this->zero || rhs.zero) {
-            this->numbers = {0};
-            this->negative = false;
-            this->zero = true;
+        // Ak 0*B
+        if (this->zero) {
             return *this;
         }
-
+        // Ak A*0
+        if (rhs.zero) {
+            SetToZero(*this);
+            return *this;
+        }
         // Nastavenie spravneho znamienka
         this->negative = !(this->negative == rhs.negative);
 
@@ -368,8 +379,7 @@ public:
         }
         // Ak A/B, kde A < B
         if (FirstSmaller(*this, rhs)) {
-            this->numbers = {0};
-            this->zero = true;
+            SetToZero(*this);
             return *this;
         }
 
@@ -395,10 +405,8 @@ public:
             return *this;
         }
         // Ak A%1 alebo A%B, kde A = B
-        if (((rhs.numbers.size() == 1) && (rhs.numbers[0] == 1)) || (this->numbers == rhs.numbers)) {
-            this->numbers = {0};
-            this->negative = false;
-            this->zero = true;
+        if (((rhs.numbers.size() == 1) && (rhs.numbers[0] == 1)) || EqualVectors(*this, rhs)) {
+            SetToZero(*this);
             return *this;
         }
         // Ak A%B, kde A < B; Da sa vyhodnotit aj cez '*this' < 'rhs'...
@@ -411,6 +419,7 @@ public:
         return *this;
     };
 
+    // sqrt
     double sqrt() const {
         // Ak zaporne cislo
         if (this->negative) {
@@ -442,6 +451,7 @@ public:
     BigInteger isqrt() const;
     bool is_prime(size_t k) const; // use rabbin-miller test with k rounds
 #endif
+
 private:
     // here you can add private data and members, but do not add stuff to 
     // public interface, also you can declare friends here if you want
@@ -463,8 +473,14 @@ private:
     friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
     friend std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
 
+    friend inline void SetToZero(BigInteger& biginteger);
     friend inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs);
     friend inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison);
+    friend inline bool GetNegative(const BigInteger& biginteger);
+    friend inline void SetNegative(BigInteger& biginteger, bool value);
+    friend inline bool GetZero(const BigInteger& biginteger);
+    friend inline void SetZero(BigInteger& biginteger, bool value);
+    friend inline bool EqualVectors(const BigInteger& lhs, const BigInteger& rhs);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -537,29 +553,34 @@ inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs) {
     return !(lhs < rhs);
 };
 
-inline std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs) {
+inline std::ostream& operator<<(std::ostream& os, const BigInteger& rhs) {
     // Ak cislo je 0
     if (rhs.zero) {
-        lhs << 0;
-        return lhs;
+        os << 0;
+        return os;
     }
     
     // Ak cislo zaporne, tak vypis znamienka
     if (rhs.negative) {
-        lhs << '-';
+        os << '-';
     }
 
     // Posledna, respektive prva cast cisla sa vypise bez prefixovych 0-ul
-    lhs << rhs.numbers.back();
+    os << rhs.numbers.back();
     // Vsetky dalsie casti cisla na vypise aj s prefixovymi 0-mi
     for (int64_t i = rhs.numbers.size() - 2; i >= 0; i--) {
-        lhs << std::setw(9) << std::setfill('0') << rhs.numbers[i];
+        os << std::setw(9) << std::setfill('0') << rhs.numbers[i];
     }
 
-    return lhs;
-
+    return os;
 };
 
+
+inline void SetToZero(BigInteger& biginteger) {
+    biginteger.numbers = {0};
+    biginteger.negative = false;
+    biginteger.zero = true;
+}
 
 inline bool FirstSmaller(const BigInteger& lhs, const BigInteger& rhs) {
     // Znamienka sa neberu do uvahy!
@@ -624,6 +645,26 @@ inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool div
     return;
 }
 
+inline bool GetNegative(const BigInteger& biginteger) {
+    return biginteger.negative;
+}
+
+inline void SetNegative(BigInteger& biginteger, bool value) {
+    biginteger.negative = value;
+}
+
+inline bool GetZero(const BigInteger& biginteger) {
+    return biginteger.zero;
+}
+
+inline void SetZero(BigInteger& biginteger, bool value) {
+    biginteger.zero = value;
+}
+
+inline bool EqualVectors(const BigInteger& lhs, const BigInteger& rhs) {
+    return (lhs.numbers == rhs.numbers);
+}
+
 
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
@@ -641,11 +682,69 @@ public:
         , denominator(1)
         , negative(false)
     {
-        //std::cout << "BigRational created\n";
+        //std::cout << "BigRational DEFAULT created\n";
     }
 
-    BigRational(int64_t a, int64_t b);
-    BigRational(const std::string& a, const std::string& b);
+    BigRational(int64_t a, int64_t b)
+        : numerator(std::abs(a))
+        , denominator(std::abs(b))
+        , negative(!((a < 0) == (b < 0)))
+    {
+        //std::cout << "BigRational 2 INTS created\n";
+        // Ak A / 0
+        if (b == 0) {
+            throw std::runtime_error("BigRational with 0 as denominator!");
+        }
+        // Ak 0 / B
+        if (a == 0) {
+            this->denominator = BigInteger(1);
+            return;
+        }
+        // Ak |A| = |B|
+        if (std::abs(a) == std::abs(b)) {
+            // Ak cisla nie su v zakladnom tvare
+            if (std::abs(a) != 1) {
+                this->numerator = BigInteger(1);
+                this->denominator = BigInteger(1);
+            }
+            return;
+        }
+        // Zjednodusenie cisla
+        SimplifyNumber(*this);
+    }
+
+    BigRational(const std::string& a, const std::string& b)
+        : numerator(a)
+        , denominator(b)
+        , negative(false)
+    {
+        //std::cout << "BigRational 2 STRINGS created\n";
+        // Ak A / 0
+        if (GetZero(this->denominator)) {
+            throw std::runtime_error("BigRational with 0 as denominator!");
+        }
+        // Ak 0 / B
+        if (GetZero(this->numerator)) {
+            this->denominator = BigInteger(1);
+            return;
+        }
+
+        // Nastavenie spravneho znamienka
+        this->negative = !(GetNegative(this->numerator) == GetNegative(this->denominator));
+
+        // Ak A = B -> rovnaju sa vektory
+        if (EqualVectors(this->numerator, this->denominator)) {
+            this->numerator = BigInteger(1);
+            this->denominator = BigInteger(1);
+            return;
+        }
+        // Prenastavenie znamienok na 'false'
+        SetNegative(this->numerator, false);
+        SetNegative(this->denominator, false);
+
+        // Zjednodusenie cisla
+        SimplifyNumber(*this);
+    }
     
     // copy
     BigRational(const BigRational& other) = default;
@@ -670,6 +769,21 @@ private:
     BigInteger numerator;
     BigInteger denominator;
     bool negative;
+
+    friend inline BigRational operator+(BigRational lhs, const BigRational& rhs);
+    friend inline BigRational operator-(BigRational lhs, const BigRational& rhs);
+    friend inline BigRational operator*(BigRational lhs, const BigRational& rhs);
+    friend inline BigRational operator/(BigRational lhs, const BigRational& rhs);
+
+    friend inline bool operator==(const BigRational& lhs, const BigRational& rhs);
+    friend inline bool operator!=(const BigRational& lhs, const BigRational& rhs);
+    friend inline bool operator<(const BigRational& lhs, const BigRational& rhs);
+    friend inline bool operator>(const BigRational& lhs, const BigRational& rhs);
+    friend inline bool operator<=(const BigRational& lhs, const BigRational& rhs);
+    friend inline bool operator>=(const BigRational& lhs, const BigRational& rhs);
+    friend inline std::ostream& operator<<(std::ostream& lhs, const BigRational& rhs);
+
+    friend inline void SimplifyNumber(BigRational& bigrational);
 };
 
 inline BigRational operator+(BigRational lhs, const BigRational& rhs);
@@ -687,7 +801,45 @@ inline bool operator>(const BigRational& lhs, const BigRational& rhs);
 inline bool operator<=(const BigRational& lhs, const BigRational& rhs);
 inline bool operator>=(const BigRational& lhs, const BigRational& rhs);
 
-inline std::ostream& operator<<(std::ostream& lhs, const BigRational& rhs);
+inline std::ostream& operator<<(std::ostream& os, const BigRational& rhs) {
+    // Ak je cislo zaporne, tak vypis znamienka
+    if (rhs.negative) {
+        os << '-';
+    }
+    // Vypis hlavnej casti
+    os << rhs.numerator;
+    // Vypis zlomkovej casti, ak to nie je 1
+    if (rhs.denominator != BigInteger(1)) {
+        os << '/' << rhs.denominator;
+    }
+    
+    return os;
+};
+
+
+inline void SimplifyNumber(BigRational& bigrational) {
+    // Ak 'nominator' = 0
+    if (GetZero(bigrational.numerator)) {
+        bigrational.denominator = BigInteger(1);
+        return;
+    }
+
+    BigInteger x = bigrational.numerator;
+    BigInteger y = bigrational.denominator;
+    BigInteger z;
+
+    // Najdenie NSD
+    while (true) {
+        z = x % y;
+        if (GetZero(z)) { break; }
+        x = y;
+        y = z;
+    }
+    // Predelenie NSD
+    bigrational.numerator /= y;
+    bigrational.denominator /= y;
+}
+
 
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
