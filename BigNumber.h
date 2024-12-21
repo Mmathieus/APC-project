@@ -250,15 +250,15 @@ public:
             *this += -rhs;
             return *this;
         }
-
         // Ak sa 'this' a 'rhs' rovnaju; Vysledok je 0
         if (*this == rhs) {
             SetToZero(*this);
             return *this;
         }
 
+        bool this_smaller = (*this < rhs);
         // 2 pripady, kedy sa odcitava vacsie od mensieho; Treba cisla prehodit a zmenit znamienko
-        if ((!this->negative && (*this < rhs)) || (this->negative && (*this > rhs))) {
+        if ((!this->negative && this_smaller) || (this->negative && !this_smaller)) {
             *this = (rhs - *this);
             this->negative = !(this->negative);
             return *this;
@@ -786,9 +786,77 @@ public:
 
 
     // binary arithmetics operators
-    BigRational& operator+=(const BigRational& rhs);
-    BigRational& operator-=(const BigRational& rhs);
+    BigRational& operator+=(const BigRational& rhs) {
+        // Ak A+0
+        if (GetZero(rhs.numerator)) {
+            return *this;
+        }
+        // Ak 0+B
+        if (GetZero(this->numerator)) {
+            *this = rhs;
+            return *this;
+        }
+        
+        // ABY SA VYKONALO SCITANIE, ZNAMIENKA SA MUSIA ROVNAT
+        // Musi sa zavolat odcitanie; Nerovnost znamienok
+        if (this->negative != rhs.negative) {
+            *this -= -rhs;
+            return *this;
+        }
+
+        // Ako na ZŠ ... menovatele nasobit az potom -> boli by zbytocne delenia -> narocnejsie ako nasobenia
+        this->numerator = ((rhs.denominator * this->numerator) + (this->denominator * rhs.numerator));
+        this->denominator *= rhs.denominator;
+
+        SimplifyNumber(*this);
+        return *this;
+    };
+    
+    BigRational& operator-=(const BigRational& rhs) {
+        // Ak A-0
+        if (GetZero(rhs.numerator)) {
+            return *this;
+        }
+        // Ak 0-B; Potreba zmenit znamienko
+        if (GetZero(this->numerator)) {
+            *this = rhs;
+            this->negative = !(this->negative);
+            return *this;
+        }
+
+        // ABY SA VYKONALO ODCITANIE, ZNAMIENKA SA MUSIA ROVNAT
+        // Musi sa zavolat scitanie; Nerovnost znamienok
+        if (this->negative != rhs.negative) {
+            *this += -rhs;
+            return *this;
+        }
+        // Ak A=B; Vysledok je 0
+        if (*this == rhs) {
+            SetToZero(this->numerator);
+            this->denominator = BigInteger(1);
+            this->negative = false;
+            return *this;
+        }
+
+        bool this_smaller = (*this < rhs);
+        // 2 pripady, kedy sa odcitava vacsie od mensieho; Treba cisla prehodit a zmenit znamienko
+        if ((!this->negative && this_smaller) || (this->negative && !this_smaller)) {
+            *this = (rhs - *this);
+            this->negative = !(this->negative);
+            SimplifyNumber(*this); 
+            return *this;
+        }
+
+        // Ako na ZŠ ... menovatele nasobit az potom -> boli by zbytocne delenia -> narocnejsie ako nasobenia
+        this->numerator = ((rhs.denominator * this->numerator) - (this->denominator * rhs.numerator)); 
+        this->denominator *= rhs.denominator;
+
+        SimplifyNumber(*this);
+        return *this; 
+    };
+    
     BigRational& operator*=(const BigRational& rhs);
+    
     BigRational& operator/=(const BigRational& rhs);
 
     double sqrt() const;
@@ -904,6 +972,7 @@ inline void SimplifyNumber(BigRational& bigrational) {
     // Ak 'nominator' = 0
     if (GetZero(bigrational.numerator)) {
         bigrational.denominator = BigInteger(1);
+        bigrational.negative = false;
         return;
     }
 
