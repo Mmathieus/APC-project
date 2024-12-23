@@ -435,16 +435,7 @@ public:
             return 1;
         }
 
-        double converted = 0;
-        // Overenie overflowu pre kazde cislo a nasledna konverzia na double
-        for (auto iterator = this->numbers.rbegin(); iterator != this->numbers.rend(); iterator++) {
-            if (((converted * MODULO) + *iterator) > std::numeric_limits<double>::max()) {
-                throw std::runtime_error("BigInteger too big!");
-            }
-            converted = (converted * MODULO) + *iterator;
-        }
-
-        return std::sqrt(converted);
+        return std::sqrt(ConvertToDouble(*this));
     };
 
 #if SUPPORT_MORE_OPS == 1
@@ -479,6 +470,7 @@ private:
     friend inline bool GetZero(const BigInteger& biginteger);
     friend inline void SetZero(BigInteger& biginteger, bool value);
     friend inline bool EqualVectors(const BigInteger& lhs, const BigInteger& rhs);
+    friend inline double ConvertToDouble(const BigInteger& biginteger);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -653,6 +645,20 @@ inline bool EqualVectors(const BigInteger& lhs, const BigInteger& rhs) {
     return (lhs.numbers == rhs.numbers);
 }
 
+inline double ConvertToDouble(const BigInteger& biginteger) {
+    double converted = 0;
+    // Overenie overflowu pre kazde cislo a nasledna konverzia na double
+    for (auto iterator = biginteger.numbers.rbegin(); iterator != biginteger.numbers.rend(); iterator++) {
+        if (((converted * MODULO) + *iterator) > std::numeric_limits<double>::max()) {
+            throw std::runtime_error("BigInteger too big!");
+        }
+        converted = (converted * MODULO) + *iterator;
+    }
+
+    return converted;
+}
+
+
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
 // whitespace, consumed characters etc...
@@ -685,6 +691,7 @@ public:
         // Ak 0 / B
         if (a == 0) {
             this->denominator = BigInteger(1);
+            this->negative = false;
             return;
         }
         // Ak |A| = |B|
@@ -855,11 +862,73 @@ public:
         return *this; 
     };
     
-    BigRational& operator*=(const BigRational& rhs);
-    
-    BigRational& operator/=(const BigRational& rhs);
+    BigRational& operator*=(const BigRational& rhs) {
+        // Nastavenie spravneho znamienka
+        this->negative = !(this->negative == rhs.negative);
+        
+        // Ak 0*B
+        if (GetZero(this->numerator)) {
+            return *this;
+        }
+        // Ak A*0
+        if (GetZero(rhs.numerator)) {
+            SetToZero(this->numerator);
+            this->denominator = BigInteger(1);
+            return *this;
+        }
 
-    double sqrt() const;
+        this->numerator *= rhs.numerator;
+        this->denominator *= rhs.denominator;
+
+        SimplifyNumber(*this);
+        return *this;
+    };
+    
+    BigRational& operator/=(const BigRational& rhs) {
+        // Ak A/0
+        if (GetZero(rhs.numerator)) {
+            throw std::runtime_error("Dividing by 0!");
+        }
+        // Ak 0/A
+        if (GetZero(this->numerator)) {
+            return *this;
+        }
+        // Nastavenie spravneho znamienka
+        this->negative = !(this->negative == rhs.negative);
+
+        // Ak A/B, kde A=B
+        if ((this->numerator == rhs.numerator) && (this->denominator == rhs.denominator)) {
+            this->numerator = BigInteger(1);
+            this->denominator = BigInteger(1);
+            return *this;
+        }
+        // Ak A/B, kde na kriz sa zlomky A a B rovnaju
+        if ((this->numerator == rhs.denominator) && (this->denominator == rhs.numerator)) {
+            return *this;
+        }
+
+        this->numerator *= rhs.denominator;
+        this->denominator *= rhs.numerator;
+
+        SimplifyNumber(*this);
+        return *this;
+    };
+
+    // sqrt
+    double sqrt() const {
+        // Ak zaporne cislo
+        if (this->negative) {
+            throw std::runtime_error("No SQRT of negative BigRational");
+        }
+        // Ak je to 0
+        if (GetZero(this->numerator)) {
+            return 0;
+        }
+
+        double converted = (ConvertToDouble(this->numerator) / ConvertToDouble(this->denominator));
+
+        return std::sqrt(converted);
+    };
 
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const;
