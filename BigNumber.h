@@ -8,10 +8,11 @@
 #include <utility>
 #include <limits>
 #include <cmath>
+#include <cassert>
 
 #define SUPPORT_IFSTREAM 0
 #define SUPPORT_MORE_OPS 0
-#define SUPPORT_EVAL 0 // special bonus
+#define SUPPORT_EVAL 0
 
 #define MODULO 1'000'000'000
 #define DIGITS 9
@@ -19,6 +20,10 @@
 class BigInteger
 {
 public:
+    std::vector<uint64_t> numbers;
+    bool negative;
+    bool zero;
+
     // constructors
     BigInteger()
         : numbers{0}
@@ -286,19 +291,21 @@ public:
             SetToZero(*this);
             return *this;
         }
-        
-        // Nastavenie spravneho znamienka
-        this->negative = !(this->negative == rhs.negative);
-
         // Ak 1*B
         if (IsOne(*this)) {
+            bool old_negative = this->negative;
             *this = rhs;
+            this->negative = !(old_negative == rhs.negative);
             return *this;
         }
         // Ak A*1
         if (IsOne(rhs)) {
+            this->negative = !(this->negative == rhs.negative);
             return *this;
         }
+
+        // Nastavenie spravneho znamienka
+        this->negative = !(this->negative == rhs.negative);
 
         // Vytvorenie noveho vektora na ukladanie medzivysledkov
         std::vector<uint64_t> storage(this->numbers.size() + rhs.numbers.size(), 0);
@@ -423,9 +430,7 @@ public:
 #endif
 
 private:
-    std::vector<uint64_t> numbers;
-    bool negative;
-    bool zero;
+    
 
     friend inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
     friend inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
@@ -519,10 +524,14 @@ inline std::ostream& operator<<(std::ostream& os, const BigInteger& rhs) {
         os << 0;
         return os;
     }
-    
     // Ak cislo zaporne, tak vypis znamienka
     if (rhs.negative) {
         os << '-';
+    }
+    // Ak cislo je 1
+    if (IsOne(rhs)) {
+        os << 1;
+        return os;
     }
 
     // Posledna, respektive prva cast cisla sa vypise bez prefixovych 0-ul
@@ -531,6 +540,34 @@ inline std::ostream& operator<<(std::ostream& os, const BigInteger& rhs) {
     for (int64_t i = rhs.numbers.size() - 2; i >= 0; i--) {
         os << std::setw(9) << std::setfill('0') << rhs.numbers[i];
     }
+
+    // // Vytvoríme reťazec z čísla
+    // std::string number_str;
+    // for (int64_t i = rhs.numbers.size() - 1; i >= 0; i--) {
+    //     // Ak ide o poslednú časť, nepridávame nuly na začiatok
+    //     if (i == rhs.numbers.size() - 1) {
+    //         number_str += std::to_string(rhs.numbers[i]);
+    //     } else {
+    //         // Pre všetky ostatné časti čísla doplníme nuly
+    //         number_str += std::to_string(rhs.numbers[i]);
+    //         number_str.insert(number_str.end() - std::to_string(rhs.numbers[i]).size(), 9 - std::to_string(rhs.numbers[i]).size(), '0');
+    //     }
+    // }
+
+    // // Teraz vytvoríme nový reťazec s medzerami každé 3 číslice
+    // std::string formatted_str;
+    // int count = 0;
+    // for (int i = number_str.size() - 1; i >= 0; i--) {
+    //     // Pridaj medzeru každé 3 číslice
+    //     if (count > 0 && count % 3 == 0) {
+    //         formatted_str = ' ' + formatted_str;
+    //     }
+    //     formatted_str = number_str[i] + formatted_str;
+    //     count++;
+    // }
+
+    // // Vypíšeme naformátovaný reťazec
+    // os << formatted_str;
 
     return os;
 };
@@ -785,7 +822,7 @@ public:
         if (GetZero(rhs.numerator)) {
             return *this;
         }
-        // Ak 0-B; Potreba zmenit znamienko (Ma zmysel)
+        // Ak 0-B; Potreba zmenit znamienko
         if (GetZero(this->numerator)) {
             *this = rhs;
             this->negative = !(this->negative);
