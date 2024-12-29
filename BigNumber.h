@@ -20,10 +20,6 @@
 class BigInteger
 {
 public:
-    std::vector<uint64_t> numbers;
-    bool negative;
-    bool zero;
-
     // constructors
     BigInteger()
         : numbers{0}
@@ -430,7 +426,9 @@ public:
 #endif
 
 private:
-    
+    std::vector<uint64_t> numbers;
+    bool negative;
+    bool zero;
 
     friend inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
     friend inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
@@ -672,6 +670,9 @@ inline std::istream& operator>>(std::istream& lhs, BigInteger& rhs); // bonus
 class BigRational
 {
 public:
+    BigInteger numerator;
+    BigInteger denominator;
+    bool negative;
     // constructors
     BigRational()
         : numerator(0)
@@ -725,6 +726,9 @@ public:
         
         // Nastavenie spravneho znamienka
         this->negative = !(GetNegative(this->numerator) == GetNegative(this->denominator));
+        // Prenastavenie znamienok na 'false'
+        SetNegative(this->numerator, false);
+        SetNegative(this->denominator, false);
 
         // Ak 1 / B alebo A / 1 -> najzakladnejsi tvar cisla
         if (IsOne(this->numerator) || IsOne(this->denominator)) {
@@ -736,9 +740,6 @@ public:
             SetToOne(this->denominator);
             return;
         }
-        // Prenastavenie znamienok na 'false'
-        SetNegative(this->numerator, false);
-        SetNegative(this->denominator, false);
 
         // Zjednodusenie cisla
         SimplifyNumber(*this);
@@ -946,9 +947,7 @@ public:
 #endif
 
 private:
-    BigInteger numerator;
-    BigInteger denominator;
-    bool negative;
+    
 
     friend inline BigRational operator+(BigRational lhs, const BigRational& rhs);
     friend inline BigRational operator-(BigRational lhs, const BigRational& rhs);
@@ -1050,12 +1049,12 @@ inline std::ostream& operator<<(std::ostream& os, const BigRational& rhs) {
 };
 
 inline void SimplifyNumber(BigRational& bigrational) {
-    // Ak cislo = 0
-    if (GetZero(bigrational.numerator)) {
-        bigrational.denominator = BigInteger(1);
-        bigrational.negative = false;
-        return;
-    }
+    // // Ak cislo = 0
+    // if (GetZero(bigrational.numerator)) {
+    //     bigrational.denominator = BigInteger(1);
+    //     bigrational.negative = false;
+    //     return;
+    // }
 
     BigInteger x = bigrational.numerator;
     BigInteger y = bigrational.denominator;
