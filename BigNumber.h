@@ -1,5 +1,5 @@
 #pragma once
-// here you can include whatever you want :)
+
 #include <string>
 #include <cstdint>
 #include <vector>
@@ -8,14 +8,14 @@
 #include <utility>
 #include <limits>
 #include <cmath>
-#include <cassert>
 
 #define SUPPORT_IFSTREAM 0
-#define SUPPORT_MORE_OPS 0
+#define SUPPORT_MORE_OPS 1
 #define SUPPORT_EVAL 0
 
 #define MODULO 1'000'000'000
 #define DIGITS 9
+
 
 class BigInteger
 {
@@ -128,6 +128,20 @@ public:
         other.zero = false;
     }
 
+    BigInteger& operator=(BigInteger&& other) noexcept {
+        // Ide o ten isty objekt
+        if (this == &other) {
+            return *this;
+        }
+        this->numbers = std::move(other.numbers);
+        this->negative = other.negative;
+        this->zero = other.zero;
+
+        other.negative = false;
+        other.zero = false;
+        
+        return *this;
+    };
 
     // copy
     BigInteger(const BigInteger& other)
@@ -421,7 +435,37 @@ public:
     };
 
 #if SUPPORT_MORE_OPS == 1
-    BigInteger isqrt() const;
+    BigInteger isqrt() const {
+        // Ak zaporne cislo
+        if (this->negative) {
+            throw std::runtime_error("No SQRT of negative BigInteger");
+        }
+        // Ak 0 alebo 1
+        if (this->zero || IsOne(*this)) {
+            return *this;
+        }
+ 
+        BigInteger guess = (*this / 2);
+        BigInteger value;
+
+        while (true) {
+            // Newton method
+            value = ((guess + (*this / guess)) / 2);
+
+            // Overenie dosiahnutia hranice
+            if ((guess == value) || ((guess+1) == value) || ((guess-1) == value)) {
+                break;
+            }
+            guess = value;
+        }
+
+        // Ak vacsie, potreba odcitat -1
+        if ((value * value) > *this)
+            value -= 1;
+
+        return value;
+    };
+
     bool is_prime(size_t k) const; // use rabbin-miller test with k rounds
 #endif
 
@@ -539,34 +583,6 @@ inline std::ostream& operator<<(std::ostream& os, const BigInteger& rhs) {
         os << std::setw(9) << std::setfill('0') << rhs.numbers[i];
     }
 
-    // // Vytvoríme reťazec z čísla
-    // std::string number_str;
-    // for (int64_t i = rhs.numbers.size() - 1; i >= 0; i--) {
-    //     // Ak ide o poslednú časť, nepridávame nuly na začiatok
-    //     if (i == rhs.numbers.size() - 1) {
-    //         number_str += std::to_string(rhs.numbers[i]);
-    //     } else {
-    //         // Pre všetky ostatné časti čísla doplníme nuly
-    //         number_str += std::to_string(rhs.numbers[i]);
-    //         number_str.insert(number_str.end() - std::to_string(rhs.numbers[i]).size(), 9 - std::to_string(rhs.numbers[i]).size(), '0');
-    //     }
-    // }
-
-    // // Teraz vytvoríme nový reťazec s medzerami každé 3 číslice
-    // std::string formatted_str;
-    // int count = 0;
-    // for (int i = number_str.size() - 1; i >= 0; i--) {
-    //     // Pridaj medzeru každé 3 číslice
-    //     if (count > 0 && count % 3 == 0) {
-    //         formatted_str = ' ' + formatted_str;
-    //     }
-    //     formatted_str = number_str[i] + formatted_str;
-    //     count++;
-    // }
-
-    // // Vypíšeme naformátovaný reťazec
-    // os << formatted_str;
-
     return os;
 };
 
@@ -670,9 +686,6 @@ inline std::istream& operator>>(std::istream& lhs, BigInteger& rhs); // bonus
 class BigRational
 {
 public:
-    BigInteger numerator;
-    BigInteger denominator;
-    bool negative;
     // constructors
     BigRational()
         : numerator(0)
@@ -681,9 +694,9 @@ public:
     {}
 
     BigRational(int64_t a, int64_t b)
-        : numerator(std::abs(a))
-        , denominator(std::abs(b))
-        , negative(!((a < 0) == (b < 0)))
+        : numerator(a)
+        , denominator(b)
+        , negative(false)
     {
         // Ak A / 0
         if (b == 0) {
@@ -692,15 +705,21 @@ public:
         // Ak 0 / B
         if (a == 0) {
             SetToOne(this->denominator);
-            this->negative = false;
             return;
         }
+
+        // Nastavenie spravneho znamienka
+        this->negative = !(GetNegative(this->numerator) == GetNegative(this->denominator));
+        // Prenastavenie znamienok na 'false'
+        SetNegative(this->numerator, false);
+        SetNegative(this->denominator, false);
+        
         // Ak 1 / B alebo A / 1 -> najzakladnejsi tvar cisla
-        if (std::abs(a) == 1 || std::abs(b) == 1) {
+        if (IsOne(this->numerator) || IsOne(this->denominator)) {
             return;
         }
-        // Ak |A| = |B|
-        if (std::abs(a) == std::abs(b)) {
+        // Ak A=B, ich vektory
+        if (EqualVectors(this->numerator, this->denominator)) {
             SetToOne(this->numerator);
             SetToOne(this->denominator);
             return;
@@ -754,6 +773,19 @@ public:
         other.negative = false;
     }
 
+    BigRational& operator=(BigRational&& other) noexcept {
+        // Ide o ten isty objekt
+        if (this == &other) {
+            return *this;
+        }
+        this->numerator = std::move(other.numerator);
+        this->denominator = std::move(other.denominator);
+        this->negative = other.negative;
+
+        other.negative = false;
+        
+        return *this;
+    }
 
     // copy
     BigRational(const BigRational& other)
@@ -763,6 +795,7 @@ public:
     {}
 
     BigRational& operator=(const BigRational& rhs) {
+        // Ide o ten isty objekt
         if (this == &rhs) {
             return *this;
         }
@@ -943,11 +976,26 @@ public:
     };
 
 #if SUPPORT_MORE_OPS == 1
-    BigInteger isqrt() const;
+    BigInteger isqrt() const {
+        // Ak zaporne cislo
+        if (this->negative) {
+            throw std::runtime_error("No SQRT of negative BigInteger");
+        }
+        // Ak 0 alebo 1
+        if (GetZero(this->numerator) || IsOneR(*this)) {
+            return this->numerator;
+        }
+
+        // Ak A / 1 -> len A; Ak A / B -> tak A/B
+        BigInteger simple = (IsOne(this->denominator)) ? this->numerator : (this->numerator / this->denominator);
+        return simple.isqrt();
+    };
 #endif
 
 private:
-    
+    BigInteger numerator;
+    BigInteger denominator;
+    bool negative;
 
     friend inline BigRational operator+(BigRational lhs, const BigRational& rhs);
     friend inline BigRational operator-(BigRational lhs, const BigRational& rhs);
@@ -1049,12 +1097,12 @@ inline std::ostream& operator<<(std::ostream& os, const BigRational& rhs) {
 };
 
 inline void SimplifyNumber(BigRational& bigrational) {
-    // // Ak cislo = 0
-    // if (GetZero(bigrational.numerator)) {
-    //     bigrational.denominator = BigInteger(1);
-    //     bigrational.negative = false;
-    //     return;
-    // }
+    // Ak cislo = 0
+    if (GetZero(bigrational.numerator)) {
+        bigrational.denominator = BigInteger(1);
+        bigrational.negative = false;
+        return;
+    }
 
     BigInteger x = bigrational.numerator;
     BigInteger y = bigrational.denominator;
