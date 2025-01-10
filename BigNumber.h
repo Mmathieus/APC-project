@@ -8,6 +8,10 @@
 #include <utility>
 #include <limits>
 #include <cmath>
+#include <sstream>
+#include <ctime>
+#include <random>
+
 
 #define SUPPORT_IFSTREAM 0
 #define SUPPORT_MORE_OPS 1
@@ -434,6 +438,88 @@ public:
         return std::sqrt(ConvertToDouble(*this));
     };
 
+    std::string ToString(/*const BigInteger& biginteger*/) const {
+        std::ostringstream oss;
+        oss << /*biginteger.*/this->numbers.back(); // Prvý (najvyšší) prvok bez doplnenia núl
+        for (int64_t i = /*biginteger.*/this->numbers.size() - 2; i >= 0; --i) { // Ostatné s doplnením
+            oss << std::setw(9) << std::setfill('0') << /*biginteger.*/this->numbers[i];
+        }
+        return oss.str();
+    }
+
+    BigInteger modpow(BigInteger a, BigInteger b, const BigInteger& mod) const {  // Compute a^b % mod
+        BigInteger result(1);
+        while (b > BigInteger(0)) {
+            if((b % BigInteger(2)) == BigInteger(1)) {
+                result = modmult(result, a, mod);
+            }
+            a = modmult(a, a, mod);
+            b /= BigInteger(2);
+        }
+        return result;
+    }
+
+    BigInteger modmult(BigInteger a, BigInteger b, const BigInteger& mod) const {  // Compute a*b % mod
+        BigInteger result(0);
+        while (b > BigInteger(0)) {
+            if((b % BigInteger(2)) == BigInteger(1)) {
+                result = (result+a) % mod;
+            }
+            a = (a+a) % mod;
+            b /= BigInteger(2);
+        }
+        return result;
+    }
+
+    std::string GenerateRandomNumber(const std::string& NUM) const {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Náhodne určíme počet číslic (od 1 po dĺžku NUM-1)
+        std::uniform_int_distribution<> lengthDist(1, NUM.length());
+        size_t numDigits = lengthDist(gen);
+
+        // Najprv generujeme prvú číslicu (nesmie byť 0)
+        std::string result;
+        std::uniform_int_distribution<> firstDigit(1, 9);
+
+        if (numDigits == NUM.length()) {
+            // Ak generujeme číslo rovnakej dĺžky ako NUM,
+            // prvá číslica musí byť menšia alebo rovná prvej číslici NUM
+            int maxFirstDigit = NUM[0] - '0';
+            std::uniform_int_distribution<> limitedFirstDigit(1, maxFirstDigit);
+            result = std::to_string(limitedFirstDigit(gen));
+        }
+        else {
+            result = std::to_string(firstDigit(gen));
+        }
+
+        // Pre každú ďalšiu pozíciu
+        for (size_t i = 1; i < numDigits; i++) {
+            if (numDigits == NUM.length() && result == NUM.substr(0, i)) {
+                // Ak sme zatiaľ rovnakí s NUM, musíme generovať menšiu číslicu
+                int maxDigit = NUM[i] - '0';
+                std::uniform_int_distribution<> limitedDigit(0, maxDigit);
+                result += std::to_string(limitedDigit(gen));
+            } else {
+                // Inak môžeme generovať ľubovoľnú číslicu
+                std::uniform_int_distribution<> otherDigits(0, 9);
+                result += std::to_string(otherDigits(gen));
+            }
+        }
+
+        if (result < "2") {
+            return "2";
+        }
+
+        return result;
+    }
+
+    
+
+    
+
+
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const {
         // Ak zaporne cislo
@@ -466,7 +552,45 @@ public:
         return value;
     };
 
-    bool is_prime(size_t k) const; // use rabbin-miller test with k rounds
+    bool is_prime(size_t k) const { // use rabbin-miller test with k rounds
+        // Cisla: 0, 1, zaporne a parne nie su PRIME
+        if (this->zero || IsOne(*this) || this->negative || ((*this % 2) == 0)) {
+            return false;
+        }
+        // Ak 2 alebo 3
+        if (this->numbers.size() == 1 && ((this->numbers[0] == 2) || (this->numbers[0] == 3))) {
+            return true;
+        }
+
+        static std::mt19937_64 randgen(0);
+        BigInteger d = (*this - BigInteger(1));
+        size_t s = 0;
+
+        while(d%2 == 0) {
+            s += 1;
+            d /= BigInteger(2);
+        }
+
+        std::string limit = (*this - BigInteger(2)).ToString();
+
+        for(size_t test = 0; test < k; test++) {
+            BigInteger a(GenerateRandomNumber(limit));
+            BigInteger x = modpow(a, d, *this);
+            
+            for(size_t i = 0; i < s; i++) {
+                BigInteger y = modmult(x, x, *this);
+                if((y == BigInteger(1)) && (x != BigInteger(1)) && (x != (*this - BigInteger(1)))) {  // Nontrivial square root of 1 modulo n
+                    return false;  // (x+1)(x-1) divisible by n, meaning gcd(x+1, n) is a factor of n, negating primality
+                }
+                x = y;
+            }
+            if(x != BigInteger(1)) {
+                return false;
+            }
+        }
+        return true;  // Number is prime with likelihood of (1/4)^num_tests
+
+    }; 
 #endif
 
 private:
@@ -497,6 +621,7 @@ private:
     friend inline void SetNegative(BigInteger& biginteger, bool value);
     friend inline bool GetZero(const BigInteger& biginteger);
     friend inline double ConvertToDouble(const BigInteger& biginteger);
+    // friend std::string ToString(const BigInteger& biginteger);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -676,6 +801,8 @@ inline double ConvertToDouble(const BigInteger& biginteger) {
 }
 
 
+
+
 #if SUPPORT_IFSTREAM == 1
 // this should behave exactly the same as reading int with respect to 
 // whitespace, consumed characters etc...
@@ -708,22 +835,23 @@ public:
             return;
         }
 
-        // Nastavenie spravneho znamienka
+        // Nastavenie spravneho znamienka | Povodna logika v inicializacnom liste ale tester...
         this->negative = !(GetNegative(this->numerator) == GetNegative(this->denominator));
         // Prenastavenie znamienok na 'false'
         SetNegative(this->numerator, false);
         SetNegative(this->denominator, false);
         
-        // Ak 1 / B alebo A / 1 -> najzakladnejsi tvar cisla
+        // Ak 1 / B alebo A / 1 -> najzakladnejsi tvar cisla | Da sa aj cez std::abs() ale tester...
         if (IsOne(this->numerator) || IsOne(this->denominator)) {
             return;
         }
-        // Ak A=B, ich vektory
+        // Ak A=B, ich vektory | Da sa aj cez std::abs() ale tester...
         if (EqualVectors(this->numerator, this->denominator)) {
             SetToOne(this->numerator);
             SetToOne(this->denominator);
             return;
         }
+        
         // Zjednodusenie cisla
         SimplifyNumber(*this);
     }
