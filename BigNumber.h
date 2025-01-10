@@ -438,87 +438,6 @@ public:
         return std::sqrt(ConvertToDouble(*this));
     };
 
-    std::string ToString(/*const BigInteger& biginteger*/) const {
-        std::ostringstream oss;
-        oss << /*biginteger.*/this->numbers.back(); // Prvý (najvyšší) prvok bez doplnenia núl
-        for (int64_t i = /*biginteger.*/this->numbers.size() - 2; i >= 0; --i) { // Ostatné s doplnením
-            oss << std::setw(9) << std::setfill('0') << /*biginteger.*/this->numbers[i];
-        }
-        return oss.str();
-    }
-
-    BigInteger modpow(BigInteger a, BigInteger b, const BigInteger& mod) const {  // Compute a^b % mod
-        BigInteger result(1);
-        while (b > BigInteger(0)) {
-            if((b % BigInteger(2)) == BigInteger(1)) {
-                result = modmult(result, a, mod);
-            }
-            a = modmult(a, a, mod);
-            b /= BigInteger(2);
-        }
-        return result;
-    }
-
-    BigInteger modmult(BigInteger a, BigInteger b, const BigInteger& mod) const {  // Compute a*b % mod
-        BigInteger result(0);
-        while (b > BigInteger(0)) {
-            if((b % BigInteger(2)) == BigInteger(1)) {
-                result = (result+a) % mod;
-            }
-            a = (a+a) % mod;
-            b /= BigInteger(2);
-        }
-        return result;
-    }
-
-    std::string GenerateRandomNumber(const std::string& NUM) const {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        // Náhodne určíme počet číslic (od 1 po dĺžku NUM-1)
-        std::uniform_int_distribution<> lengthDist(1, NUM.length());
-        size_t numDigits = lengthDist(gen);
-
-        // Najprv generujeme prvú číslicu (nesmie byť 0)
-        std::string result;
-        std::uniform_int_distribution<> firstDigit(1, 9);
-
-        if (numDigits == NUM.length()) {
-            // Ak generujeme číslo rovnakej dĺžky ako NUM,
-            // prvá číslica musí byť menšia alebo rovná prvej číslici NUM
-            int maxFirstDigit = NUM[0] - '0';
-            std::uniform_int_distribution<> limitedFirstDigit(1, maxFirstDigit);
-            result = std::to_string(limitedFirstDigit(gen));
-        }
-        else {
-            result = std::to_string(firstDigit(gen));
-        }
-
-        // Pre každú ďalšiu pozíciu
-        for (size_t i = 1; i < numDigits; i++) {
-            if (numDigits == NUM.length() && result == NUM.substr(0, i)) {
-                // Ak sme zatiaľ rovnakí s NUM, musíme generovať menšiu číslicu
-                int maxDigit = NUM[i] - '0';
-                std::uniform_int_distribution<> limitedDigit(0, maxDigit);
-                result += std::to_string(limitedDigit(gen));
-            } else {
-                // Inak môžeme generovať ľubovoľnú číslicu
-                std::uniform_int_distribution<> otherDigits(0, 9);
-                result += std::to_string(otherDigits(gen));
-            }
-        }
-
-        if (result < "2") {
-            return "2";
-        }
-
-        return result;
-    }
-
-    
-
-    
-
 
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const {
@@ -554,49 +473,109 @@ public:
 
     bool is_prime(size_t k) const { // use rabbin-miller test with k rounds
         // Cisla: 0, 1, zaporne a parne nie su PRIME
-        if (this->zero || IsOne(*this) || this->negative || ((*this % 2) == 0)) {
+        if (this->zero || IsOne(*this) || this->negative) {
             return false;
         }
         // Ak 2 alebo 3
         if (this->numbers.size() == 1 && ((this->numbers[0] == 2) || (this->numbers[0] == 3))) {
             return true;
         }
+        // Parne cislo nie je PRIME
+        if ((*this % 2) == 0) {
+            return false;
+        }
 
-        static std::mt19937_64 randgen(0);
         BigInteger d = (*this - BigInteger(1));
         size_t s = 0;
 
-        while(d%2 == 0) {
-            s += 1;
+        while((d % 2) == 0) {
+            s++;
             d /= BigInteger(2);
         }
 
-        std::string limit = (*this - BigInteger(2)).ToString();
-
-        for(size_t test = 0; test < k; test++) {
-            BigInteger a(GenerateRandomNumber(limit));
+        for (size_t test = 0; test < k; test++) {
+            
+            BigInteger a = PickRandomBigInteger(ToString(*this - BigInteger(2)));
             BigInteger x = modpow(a, d, *this);
             
-            for(size_t i = 0; i < s; i++) {
+            for (size_t i = 0; i < s; i++) {
                 BigInteger y = modmult(x, x, *this);
-                if((y == BigInteger(1)) && (x != BigInteger(1)) && (x != (*this - BigInteger(1)))) {  // Nontrivial square root of 1 modulo n
-                    return false;  // (x+1)(x-1) divisible by n, meaning gcd(x+1, n) is a factor of n, negating primality
+                if ((y == BigInteger(1)) && (x != BigInteger(1)) && (x != (*this - BigInteger(1)))) {
+                    return false;
                 }
                 x = y;
             }
-            if(x != BigInteger(1)) {
+            if (x != BigInteger(1)) {
                 return false;
             }
         }
-        return true;  // Number is prime with likelihood of (1/4)^num_tests
-
+        
+        return true;
     }; 
 #endif
+
 
 private:
     std::vector<uint64_t> numbers;
     bool negative;
     bool zero;
+
+    std::string ToString(const BigInteger& biginteger) const {
+        std::ostringstream oss;
+        oss << biginteger.numbers.back();
+        for (int64_t i = biginteger.numbers.size() - 2; i >= 0; i--) {
+            oss << std::setw(9) << std::setfill('0') << biginteger.numbers[i];
+        }
+        return oss.str();
+    }
+
+    BigInteger PickRandomBigInteger(const std::string& NUM) const {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Nahodne sa vyberie pocet cifier (1 az NUM)
+        std::uniform_int_distribution<int32_t> lengthDist(1, NUM.length());
+        size_t numDigits = lengthDist(gen);
+
+        std::string result;
+
+        // Vyber cifier
+        for (size_t i = 0; i < numDigits; i++) {
+            int32_t maxDigit = ((numDigits == NUM.length()) && (result == NUM.substr(0, i))) ? NUM[i] - '0' : 9;
+            std::uniform_int_distribution<int32_t> nextDigit((i == 0) ? 1 : 0, maxDigit);
+            result += ('0' + nextDigit(gen));
+        }
+        // Minimum musi byt 2
+        if (result < std::string("2")) {
+            result = "2";
+        }
+
+        return BigInteger(result);
+    }
+
+    BigInteger modmult(BigInteger a, BigInteger b, const BigInteger& mod) const {  // Compute a*b % mod
+        BigInteger result(0);
+        while (b > BigInteger(0)) {
+            if ((b % BigInteger(2)) == BigInteger(1)) {
+                result = (result + a) % mod;
+            }
+            a = (a + a) % mod;
+            b /= BigInteger(2);
+        }
+        return result;
+    }
+
+    BigInteger modpow(BigInteger& a, BigInteger& b, const BigInteger& mod) const {  // Compute a^b % mod
+        BigInteger result(1);
+        while (b > BigInteger(0)) {
+            if ((b % BigInteger(2)) == BigInteger(1)) {
+                result = modmult(result, a, mod);
+            }
+            a = modmult(a, a, mod);
+            b /= BigInteger(2);
+        }
+        return result;
+    }
 
     friend inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs);
     friend inline BigInteger operator-(BigInteger lhs, const BigInteger& rhs);
@@ -612,7 +591,7 @@ private:
     friend inline bool operator>=(const BigInteger& lhs, const BigInteger& rhs);
     friend std::ostream& operator<<(std::ostream& lhs, const BigInteger& rhs);
 
-    friend inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison);
+    friend void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison);
     friend inline bool EqualVectors(const BigInteger& lhs, const BigInteger& rhs);
     friend inline void SetToZero(BigInteger& biginteger);
     friend inline void SetToOne(BigInteger& biginteger);
@@ -621,7 +600,6 @@ private:
     friend inline void SetNegative(BigInteger& biginteger, bool value);
     friend inline bool GetZero(const BigInteger& biginteger);
     friend inline double ConvertToDouble(const BigInteger& biginteger);
-    // friend std::string ToString(const BigInteger& biginteger);
 };
 
 inline BigInteger operator+(BigInteger lhs, const BigInteger& rhs) { lhs += rhs; return lhs; };
@@ -711,7 +689,7 @@ inline std::ostream& operator<<(std::ostream& os, const BigInteger& rhs) {
     return os;
 };
 
-inline void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison) {
+void DivisionModuloLogic(BigInteger& lhs, const BigInteger& rhs, bool divison) {
     // Vytvorenie konstanty pre nasobenie, buduceho vysledku
     BigInteger constant(2);
     BigInteger answer;
@@ -799,8 +777,6 @@ inline double ConvertToDouble(const BigInteger& biginteger) {
     }
     return converted;
 }
-
-
 
 
 #if SUPPORT_IFSTREAM == 1
@@ -1227,7 +1203,7 @@ inline std::ostream& operator<<(std::ostream& os, const BigRational& rhs) {
 inline void SimplifyNumber(BigRational& bigrational) {
     // Ak cislo = 0
     if (GetZero(bigrational.numerator)) {
-        bigrational.denominator = BigInteger(1);
+        SetToOne(bigrational.denominator);
         bigrational.negative = false;
         return;
     }
