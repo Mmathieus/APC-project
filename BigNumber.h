@@ -12,7 +12,6 @@
 #include <ctime>
 #include <random>
 
-
 #define SUPPORT_IFSTREAM 0
 #define SUPPORT_MORE_OPS 1
 #define SUPPORT_EVAL 0
@@ -438,7 +437,6 @@ public:
         return std::sqrt(ConvertToDouble(*this));
     };
 
-
 #if SUPPORT_MORE_OPS == 1
     BigInteger isqrt() const {
         // Ak zaporne cislo
@@ -472,7 +470,7 @@ public:
     };
 
     bool is_prime(size_t k) const { // use rabbin-miller test with k rounds
-        // Cisla: 0, 1, zaporne a parne nie su PRIME
+        // Cisla: 0, 1, zaporne nie su PRIME
         if (this->zero || IsOne(*this) || this->negative) {
             return false;
         }
@@ -513,7 +511,6 @@ public:
         return true;
     }; 
 #endif
-
 
 private:
     std::vector<uint64_t> numbers;
